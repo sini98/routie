@@ -18,6 +18,12 @@ type MapProps = {
   onPickLocation?: (lat: number, lng: number) => void;
   /** 검색 결과 등으로 지도를 특정 좌표로 강제 이동시키고 싶을 때 사용합니다(네이버 지도 전용). */
   focusRequest?: FocusRequest | null;
+  /**
+   * "오늘 외출 + 장소 0개"처럼 defaultRegion(지정 외출에서 검색해둔 지역 등)을 무시하고
+   * 현재 위치(또는 실패 시 서울)만 쓰고 싶은 화면에서 넘기세요. NaverMap 전용이며 자세한
+   * 설명은 그쪽 타입 주석 참고.
+   */
+  currentLocationOnly?: Coords | null;
 };
 
 /**
@@ -33,6 +39,7 @@ export default function Map({
   pickedLocation = null,
   onPickLocation,
   focusRequest = null,
+  currentLocationOnly,
 }: MapProps) {
   const hasClientId = Boolean(process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID);
   const [status, setStatus] = useState<"loading" | "ready" | "error">(hasClientId ? "loading" : "error");
@@ -65,6 +72,7 @@ export default function Map({
         pickedLocation={pickedLocation}
         onPickLocation={onPickLocation}
         focusRequest={focusRequest}
+        currentLocationOnly={currentLocationOnly}
       />
       {status === "loading" && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-accent">

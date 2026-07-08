@@ -24,6 +24,15 @@ type NaverMapProps = {
   onPickLocation?: (lat: number, lng: number) => void;
   /** 검색 결과 등으로 지도를 특정 좌표로 강제 이동시키고 싶을 때 사용합니다. */
   focusRequest?: FocusRequest | null;
+  /**
+   * "오늘 외출 + 장소 0개"처럼 "현재 위치를 최우선으로 쓰고, 실패하면 서울 기본값을 쓰는"
+   * 화면에서만 이 prop을 넘기세요(undefined로 아예 생략하면 원래대로 defaultRegion을 씁니다).
+   * 넘기면 defaultRegion(지정 외출에서 검색해둔 지역 등)은 완전히 무시하고
+   * `currentLocationOnly ?? DEFAULT_COORDS`만 씁니다 — null은 "아직 현재 위치를 모름
+   * (조회 중이거나 실패함)"이라는 뜻입니다. 지정 외출에서 검색한 지역이 오늘 외출의
+   * 시작 위치로 계속 남아있던 문제를 막기 위한 분리입니다.
+   */
+  currentLocationOnly?: Coords | null;
 };
 
 const MIN_ZOOM = 10;
@@ -39,6 +48,7 @@ export default function NaverMap({
   pickedLocation = null,
   onPickLocation,
   focusRequest = null,
+  currentLocationOnly,
 }: NaverMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -51,9 +61,24 @@ export default function NaverMap({
   const status = useNaverMapsLoader();
   const [defaultRegion] = useDefaultRegion();
 
+  // "오늘 외출 + 장소 0개"처럼 currentLocationOnly가 넘어온 화면에서는 defaultRegion(지정
+  // 외출에서 검색해둔 지역 등)을 아예 쳐다보지 않고, 현재 위치 또는 서울 기본값만 씁니다.
+  // currentLocationOnly가 애초에 생략된(undefined) 화면(달력에서 고른 날짜 등)에서는
+  // 예전처럼 defaultRegion을 씁니다.
+  const usesLiveLocationOnly = currentLocationOnly !== undefined;
+  const emptyStateCenter = usesLiveLocationOnly ? currentLocationOnly ?? DEFAULT_COORDS : defaultRegion ?? DEFAULT_COORDS;
+  // reason은 "currentLocation" | "defaultLocation" | "savedRegion" 중 하나로 통일합니다
+  // (장소 기준 센터링은 아래 마커 effect에서 "savedItinerary"로 따로 로그를 남깁니다).
+  const emptyStateCenterReason = usesLiveLocationOnly
+    ? currentLocationOnly
+      ? "currentLocation"
+      : "defaultLocation"
+    : defaultRegion
+      ? "savedRegion"
+      : "defaultLocation";
+
   // 지도 SDK 로딩 상태에 따라 지도 인스턴스를 초기화하거나 에러를 알립니다.
-  // 장소가 하나도 없을 때 지도를 어디부터 보여줄지는 사용자가 고른(또는 위치 권한으로 얻은)
-  // 기본 지역을 우선 사용하고, 아직 정해지지 않았으면 서울을 fallback으로 씁니다.
+  // 장소가 하나도 없을 때 지도를 어디부터 보여줄지는 위 emptyStateCenter로 정해집니다.
   useEffect(() => {
     if (status === "error") {
       onLoadError();
@@ -62,7 +87,16 @@ export default function NaverMap({
     if (status !== "ready" || !mapContainerRef.current || mapRef.current) return;
 
     const naver = window.naver;
-    const center = defaultRegion ?? DEFAULT_COORDS;
+    const center = emptyStateCenter;
+    console.log("[Routie][Debug][NaverMap] 지도 생성 — finalCenter 결정", {
+      finalCenter: center,
+      reason: emptyStateCenterReason,
+      usesLiveLocationOnly,
+      currentLocationOnly,
+      savedRegion: defaultRegion,
+      defaultLocation: DEFAULT_COORDS,
+      placesLength: places.length,
+    });
     // 확대/축소 버튼(UI)은 숨기되, 마우스 휠/드래그/모바일 핀치 확대는 기본값 그대로 동작합니다.
     mapRef.current = new naver.maps.Map(mapContainerRef.current, {
       center: new naver.maps.LatLng(center.lat, center.lng),
@@ -71,7 +105,7 @@ export default function NaverMap({
     });
     onReady();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, defaultRegion]);
+  }, [status, emptyStateCenter.lat, emptyStateCenter.lng]);
 
   // 컨테이너 실제 크기가 바뀔 때마다 네이버 지도 내부 크기 캐시를 갱신해,
   // 확대/축소와 무관하게 클릭 좌표 변환이 항상 실제 렌더링 크기 기준으로 정확하게 이뤄지도록 합니다.
@@ -90,6 +124,27 @@ export default function NaverMap({
       resizeObserver.disconnect();
     };
   }, [status]);
+
+  // emptyStateCenter는 지도가 만들어진 뒤 비동기로(예: 위치 조회가 늦게 끝남) 바뀔 수
+  // 있습니다. 위 생성 effect는 mapRef.current가 이미 있으면 그냥 반환하기 때문에, 이
+  // effect가 없으면 "오늘 외출"에서 위치를 나중에 받아도 지도가 그 위치로 옮겨가지
+  // 않습니다. 장소가 하나도 없는 동안에만 옮기고, 장소가 생기면 아래 마커 effect의 장소
+  // 기준 뷰가 항상 우선합니다.
+  useEffect(() => {
+    if (!mapRef.current || !window.naver?.maps) return;
+    if (places.length > 0) {
+      console.log("[Routie][Debug][NaverMap] emptyStateCenter 바뀜 — 장소가 있어서 무시", {
+        emptyStateCenter,
+        placesLength: places.length,
+      });
+      return;
+    }
+    console.log("[Routie][Debug][NaverMap] emptyStateCenter 바뀜 — finalCenter 재설정", {
+      finalCenter: emptyStateCenter,
+      reason: emptyStateCenterReason,
+    });
+    mapRef.current.setCenter(new window.naver.maps.LatLng(emptyStateCenter.lat, emptyStateCenter.lng));
+  }, [emptyStateCenter.lat, emptyStateCenter.lng, places.length]);
 
   // 장소/선택 상태가 바뀔 때마다 마커와 폴리라인을 다시 그립니다.
   useEffect(() => {
@@ -171,6 +226,11 @@ export default function NaverMap({
     prevPlacesRef.current = places;
 
     if (placesChanged) {
+      console.log("[Routie][Debug][NaverMap] 장소 목록 기준으로 finalCenter 결정", {
+        reason: "savedItinerary",
+        placesLength: places.length,
+        places: places.map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng })),
+      });
       if (places.length === 1) {
         mapRef.current.setCenter(bounds.getCenter());
         mapRef.current.setZoom(16);

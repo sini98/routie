@@ -54,7 +54,7 @@ export default function Home() {
     <div className="mx-auto flex h-dvh max-w-md flex-col bg-background">
       <Header />
 
-      <div className="flex shrink-0 flex-col gap-3 px-5">
+      <div className="mt-6 flex shrink-0 flex-col gap-3 px-5">
         <HomeMenuCard
           href="/today"
           icon={Navigation}

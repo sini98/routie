@@ -15,10 +15,3 @@ export const DEFAULT_COORDS = {
   lat: 37.5665,
   lng: 126.978,
 };
-
-/** 오늘 날짜에 처음 진입했을 때 한 번 시딩되는 예시 일정 */
-export const INITIAL_PLACES: Place[] = [
-  { id: "1", name: "서울아산병원", time: "18:00", memo: "정기 검진", lat: 37.5262, lng: 127.1086 },
-  { id: "2", name: "잠실 카페", time: "19:30", memo: "대기 시간 보내기", lat: 37.5133, lng: 127.1 },
-  { id: "3", name: "저녁식사", time: "21:00", memo: "근처 맛집", lat: 37.511, lng: 127.0982 },
-];

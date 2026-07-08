@@ -21,6 +21,7 @@ import { restrictToParentElement, restrictToVerticalAxis } from "@dnd-kit/modifi
 import { Place } from "@/types/place";
 import ScheduleCard from "./ScheduleCard";
 import TravelConnector from "./TravelConnector";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 type ScheduleListProps = {
   places: Place[];
@@ -53,6 +54,10 @@ export default function ScheduleList({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  // 드래그로 순서를 한 번이라도 바꿔본 적이 있으면 안내 문구를 더 이상 보여주지 않습니다
+  // (처음 써보는 사용자에게만 필요한 힌트라서, 계속 떠 있으면 오히려 방해가 됩니다).
+  const [hasReordered, setHasReordered] = useLocalStorage("routie:hasReorderedSchedule", false);
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -62,6 +67,7 @@ export default function ScheduleList({
     if (oldIndex === -1 || newIndex === -1) return;
 
     onReorder(arrayMove(places, oldIndex, newIndex));
+    if (!hasReordered) setHasReordered(true);
   };
 
   const handleMove = (id: string, direction: "up" | "down") => {
@@ -74,9 +80,14 @@ export default function ScheduleList({
 
   return (
     <div className="flex flex-col gap-2 px-3 py-3">
-      <div className="flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold text-foreground">일정</h2>
-        <span className="text-xs text-muted-foreground">총 {places.length}곳</span>
+      <div className="flex flex-col gap-0.5 px-1">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">일정</h2>
+          <span className="text-xs text-muted-foreground">총 {places.length}곳</span>
+        </div>
+        {places.length >= 2 && !hasReordered && (
+          <p className="mb-1.5 text-[11px] text-[#999]">카드를 드래그하여 순서를 변경해보세요.</p>
+        )}
       </div>
 
       <DndContext

@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 import { addDaysToKey, formatDateLabel } from "@/lib/date";
 import BottomSheet from "@/components/BottomSheet";
 import { Button } from "@/components/ui/button";
@@ -88,7 +88,18 @@ export default function OutingHeader({ date, isToday, title, onRenameTitle }: Ou
         </button>
       </div>
 
-      <div className="w-9 shrink-0" aria-hidden="true" />
+      {isToday ? (
+        <button
+          type="button"
+          onClick={() => router.push("/calendar")}
+          aria-label="지정 외출로 이동"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted active:scale-95"
+        >
+          <CalendarIcon className="h-5 w-5" />
+        </button>
+      ) : (
+        <div className="w-10 shrink-0" aria-hidden="true" />
+      )}
 
       <BottomSheet open={isRenameOpen} onOpenChange={setIsRenameOpen} title="일정 이름 수정">
         <form onSubmit={handleRenameSubmit} className="flex flex-col gap-3">

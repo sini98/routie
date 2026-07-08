@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useLocalStorage } from "./useLocalStorage";
-import { INITIAL_PLACES, Place } from "@/types/place";
+import { Place } from "@/types/place";
 import { addDaysToKey, formatDateLabel, getTodayDateString } from "@/lib/date";
 import { generateId } from "@/lib/id";
 
@@ -59,19 +59,17 @@ export function useOutingsMap() {
   return [outings, setOutings, isLoaded] as const;
 }
 
-/** 특정 날짜의 일정만 다루고 싶을 때 사용합니다 (예: 오늘/지정 외출 화면). */
+/**
+ * 특정 날짜의 일정만 다루고 싶을 때 사용합니다 (예: 오늘/지정 외출 화면).
+ * 예전에는 오늘 날짜에 처음 들어오면 예시 장소(INITIAL_PLACES) 3곳을 자동으로 채워 넣었는데,
+ * 그러면 "장소가 하나도 없을 때 현재 위치를 기준으로 시작"하는 로직이 사실상 항상 건너뛰어지고
+ * (예시 장소가 이미 있으니까), localStorage를 지워도 매번 예시 데이터가 다시 채워져 현재
+ * 위치 기준 동작을 테스트하기 어려웠습니다. 지금은 자동으로 아무것도 채우지 않습니다 —
+ * 정말 장소가 없으면 EmptyState가 뜨고, 오늘 외출이면 useAutoLocate가 현재 위치를 기준으로
+ * 지도를 보여줍니다.
+ */
 export function useOuting(date: string) {
   const [outings, setOutings, isLoaded] = useOutingsMap();
-
-  useEffect(() => {
-    if (!isLoaded) return;
-    const today = getTodayDateString();
-    if (date !== today) return;
-    setOutings((prev) =>
-      date in prev ? prev : { ...prev, [date]: { title: null, places: INITIAL_PLACES, updatedAt: Date.now() } }
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoaded, date]);
 
   const entry = outings[date];
   const places = entry?.places ?? [];

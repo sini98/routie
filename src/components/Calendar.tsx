@@ -1,10 +1,16 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import BottomSheet from "@/components/BottomSheet";
 import { getTodayDateString, toDateKey } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+// 달력을 몇 번씩 넘기지 않고도 먼 과거/미래 연도로 바로 이동할 수 있도록, 현재 보고 있는
+// 연도와 오늘 연도 양쪽에서 20년씩 여유를 둔 범위를 보여줍니다(둘 중 어느 쪽이든 이 범위
+// 안에 항상 포함되도록 최소/최대 기준으로 계산합니다).
+const YEAR_PICKER_PADDING = 20;
 
 type CalendarProps = {
   viewYear: number;
@@ -14,6 +20,7 @@ type CalendarProps = {
   onSelectDate: (dateKey: string) => void;
   onPrevMonth: () => void;
   onNextMonth: () => void;
+  onSelectYear: (year: number) => void;
 };
 
 function getMonthCells(year: number, month: number) {
@@ -37,9 +44,31 @@ export default function Calendar({
   onSelectDate,
   onPrevMonth,
   onNextMonth,
+  onSelectYear,
 }: CalendarProps) {
   const cells = getMonthCells(viewYear, viewMonth);
   const today = getTodayDateString();
+  const todayYear = Number(today.slice(0, 4));
+
+  const [isYearPickerOpen, setIsYearPickerOpen] = useState(false);
+  const selectedYearRef = useRef<HTMLButtonElement | null>(null);
+
+  // viewYear·todayYear 둘 중 무엇이든 항상 목록 안에 들어오도록 범위를 계산합니다 —
+  // 그래야 사용자가 이미 먼 연도를 보고 있는 상태에서 다시 열어도 목록이 잘리지 않습니다.
+  const rangeStart = Math.min(viewYear, todayYear) - YEAR_PICKER_PADDING;
+  const rangeEnd = Math.max(viewYear, todayYear) + YEAR_PICKER_PADDING;
+  const years = Array.from({ length: rangeEnd - rangeStart + 1 }, (_, index) => rangeStart + index);
+
+  // 시트를 열 때마다 현재 보고 있는 연도가 바로 화면 중앙에 보이도록 스크롤합니다.
+  useEffect(() => {
+    if (!isYearPickerOpen) return;
+    selectedYearRef.current?.scrollIntoView({ block: "center" });
+  }, [isYearPickerOpen]);
+
+  const handleSelectYear = (year: number) => {
+    onSelectYear(year);
+    setIsYearPickerOpen(false);
+  };
 
   return (
     <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
@@ -52,9 +81,14 @@ export default function Calendar({
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <p className="text-sm font-semibold text-foreground">
+        <button
+          type="button"
+          onClick={() => setIsYearPickerOpen(true)}
+          aria-label="연도 선택"
+          className="rounded-md px-2 py-1 text-sm font-semibold text-foreground transition-colors hover:bg-muted active:scale-95"
+        >
           {viewYear}년 {viewMonth + 1}월
-        </p>
+        </button>
         <button
           type="button"
           onClick={onNextMonth}
@@ -103,6 +137,33 @@ export default function Calendar({
           );
         })}
       </div>
+
+      <BottomSheet open={isYearPickerOpen} onOpenChange={setIsYearPickerOpen} title="연도 선택">
+        <div className="grid max-h-[55vh] grid-cols-4 gap-2 overflow-y-auto">
+          {years.map((year) => {
+            const isSelectedYear = year === viewYear;
+            const isCurrentYear = year === todayYear;
+            return (
+              <button
+                key={year}
+                type="button"
+                ref={isSelectedYear ? selectedYearRef : undefined}
+                onClick={() => handleSelectYear(year)}
+                className={cn(
+                  "flex h-11 items-center justify-center rounded-lg text-sm transition-colors",
+                  isSelectedYear
+                    ? "bg-primary font-semibold text-primary-foreground"
+                    : isCurrentYear
+                      ? "border border-primary text-primary"
+                      : "text-foreground hover:bg-muted"
+                )}
+              >
+                {year}년
+              </button>
+            );
+          })}
+        </div>
+      </BottomSheet>
     </div>
   );
 }

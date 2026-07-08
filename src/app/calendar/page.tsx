@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import Calendar from "@/components/Calendar";
+import RegionSearch from "@/components/RegionSearch";
 import { Button } from "@/components/ui/button";
 import { useOutingsMap } from "@/hooks/useOutings";
 import { formatDateLabel, getTodayDateString } from "@/lib/date";
@@ -37,6 +38,11 @@ export default function CalendarPage() {
     setViewMonth(next.getMonth());
   };
 
+  // 연도만 바꾸고 보고 있던 월은 그대로 유지합니다.
+  const handleSelectYear = (year: number) => {
+    setViewYear(year);
+  };
+
   return (
     <div className="mx-auto flex h-dvh max-w-md flex-col bg-background">
       <header
@@ -66,6 +72,7 @@ export default function CalendarPage() {
           onSelectDate={setSelectedDate}
           onPrevMonth={handlePrevMonth}
           onNextMonth={handleNextMonth}
+          onSelectYear={handleSelectYear}
         />
 
         <div className="mt-4 rounded-lg border border-border bg-card p-4 shadow-sm">
@@ -88,6 +95,15 @@ export default function CalendarPage() {
             </ul>
           ) : (
             <p className="mb-4 text-sm text-muted-foreground">예정된 외출이 없어요</p>
+          )}
+
+          {!hasOuting && (
+            <div className="mb-3">
+              <p className="mb-1.5 text-xs text-muted-foreground">
+                지역을 검색하면 그 위치를 기준으로 새 외출을 시작해요
+              </p>
+              <RegionSearch key={selectedDate} targetPath={`/outing/${selectedDate}`} />
+            </div>
           )}
 
           <Button type="button" className="w-full" onClick={() => router.push(`/outing/${selectedDate}`)}>
