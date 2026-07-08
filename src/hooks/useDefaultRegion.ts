@@ -15,8 +15,8 @@ const STORAGE_KEY = "routie:defaultRegion";
 export function useDefaultRegion() {
   const [value, setValue, isLoaded] = useLocalStorage<RegionCoords | null>(STORAGE_KEY, null);
 
-  // 디버깅용: 이 훅을 쓰는 모든 컴포넌트(NaverMap, useAutoLocate, RegionSetup, RegionSearch)에서
-  // routie:defaultRegion 값이 실제로 무엇인지, 언제 바뀌는지 콘솔에서 바로 확인할 수 있습니다.
+  // 디버깅용: 이 훅을 쓰는 컴포넌트(NaverMap, RegionSetup)에서 routie:defaultRegion 값이
+  // 실제로 무엇인지, 언제 바뀌는지 콘솔에서 바로 확인할 수 있습니다.
   const prevValueRef = useRef<RegionCoords | null | undefined>(undefined);
   useEffect(() => {
     if (!isLoaded) return;

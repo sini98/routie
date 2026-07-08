@@ -143,7 +143,11 @@ export default function NaverMap({
       finalCenter: emptyStateCenter,
       reason: emptyStateCenterReason,
     });
-    mapRef.current.setCenter(new window.naver.maps.LatLng(emptyStateCenter.lat, emptyStateCenter.lng));
+    // 이제 지도는 위치 조회가 끝나기 전부터(임시 중심으로) 바로 보이기 때문에, 나중에 실제
+    // 위치가 도착했을 때 setCenter로 순간 이동시키면 "갑자기 튀는" 느낌을 줍니다. panTo로
+    // 부드럽게 이동시켜 의도된 전환처럼 느껴지게 합니다(최초 생성 시 중심 지정은 애니메이션이
+    // 필요 없으므로 위쪽 생성 effect는 그대로 setCenter를 씁니다).
+    mapRef.current.panTo(new window.naver.maps.LatLng(emptyStateCenter.lat, emptyStateCenter.lng));
   }, [emptyStateCenter.lat, emptyStateCenter.lng, places.length]);
 
   // 장소/선택 상태가 바뀔 때마다 마커와 폴리라인을 다시 그립니다.

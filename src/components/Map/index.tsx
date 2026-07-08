@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
 import { Place } from "@/types/place";
 import NaverMap, { type FocusRequest } from "./NaverMap";
 import MockMap from "./MockMap";
@@ -75,8 +76,12 @@ export default function Map({
         currentLocationOnly={currentLocationOnly}
       />
       {status === "loading" && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-accent">
-          <p className="text-sm font-medium text-muted-foreground">지도를 불러오는 중...</p>
+        // 정적인 문구만 있으면 "멈춘 화면"처럼 보이기 쉬워서, 지도 타일을 흉내 낸 펄스
+        // 애니메이션 스켈레톤 + 문구를 함께 보여줍니다 — 계속 뭔가 진행 중이라는 인상을 줍니다.
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 overflow-hidden bg-accent">
+          <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-muted/60 via-accent to-muted/60" />
+          <Loader2 className="relative h-5 w-5 animate-spin text-muted-foreground" />
+          <p className="relative text-sm font-medium text-muted-foreground">지도를 불러오는 중...</p>
         </div>
       )}
     </div>

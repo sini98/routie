@@ -136,30 +136,33 @@ export default function OutingScreen({ date }: OutingScreenProps) {
           <p className="absolute left-1/2 top-3 z-10 w-[85%] max-w-xs -translate-x-1/2 rounded-xl bg-white/90 px-3 py-1.5 text-center text-xs font-medium text-muted-foreground shadow-sm">
             현재 위치를 기준으로 지도를 불러왔어요. 정확한 위치는 지도에서 조정해 주세요.
           </p>
-        ) : !(isTodayEmpty && locateStatus === "checking") ? (
+        ) : isTodayEmpty && locateStatus === "checking" ? (
+          // 예전에는 이 상태일 때 지도를 불투명 오버레이로 완전히 가려서, 위치 조회(최대
+          // 8초 x 2단계)가 끝날 때까지 화면이 "멈춘 것처럼" 보였습니다. 지금은 지도를 곧바로
+          // 보여주고(서울 기본값 등으로 시작) 이 작은 배지만 얹어서, 위치가 나중에 도착하면
+          // 지도가 부드럽게(panTo) 실제 위치로 옮겨갑니다 — 체감상 화면이 훨씬 빨리 반응합니다.
+          <p className="absolute left-1/2 top-3 z-10 flex items-center gap-1.5 -translate-x-1/2 whitespace-nowrap rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            현재 위치를 확인하는 중...
+          </p>
+        ) : (
           <p className="absolute left-1/2 top-3 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">
             지도에서 방문 순서를 확인해보세요
           </p>
-        ) : null}
+        )}
 
         {/* 지도 자체(및 네이버 지도 SDK 스크립트 로딩)는 위치 조회와 상관없이 항상 마운트해
             둡니다 — 그래야 스크립트 로딩과 위치 조회가 동시에 진행돼 체감 속도가 빨라집니다.
-            다만 위치 조회 중(locateStatus === "checking")에는 이 불투명 오버레이로 완전히
-            가려서 화면에 아무 좌표도 보이지 않게 막습니다. 오늘 외출 + 장소 0개일 때는
-            currentLocationOnly를 넘겨 NaverMap이 defaultRegion(지정 외출에서 검색해둔
-            지역 등)을 완전히 무시하고 현재 위치(또는 실패 시 서울)만 쓰도록 합니다. */}
+            위치 조회 중이라고 지도를 가리지 않고 바로 보여줍니다(위 배지만으로 안내) —
+            오늘 외출 + 장소 0개일 때는 currentLocationOnly를 넘겨 NaverMap이 defaultRegion
+            (지정 외출에서 검색해둔 지역 등)을 완전히 무시하고 현재 위치(또는 실패 시 서울)만
+            쓰도록 합니다. */}
         <Map
           places={places}
           selectedId={selectedId}
           onSelectPlace={setSelectedId}
           currentLocationOnly={isTodayEmpty ? currentLocation : undefined}
         />
-        {isTodayEmpty && locateStatus === "checking" && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-accent text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <p className="text-xs font-medium">현재 위치를 불러오는 중...</p>
-          </div>
-        )}
       </div>
 
       <div

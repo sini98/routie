@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { LocateFixed, Loader2, Search, Store, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,12 @@ import { useAutoLocate } from "@/hooks/useAutoLocate";
 import type { Place } from "@/types/place";
 
 type Coords = { lat: number; lng: number };
+
+// 이 화면은 지도에서 기존 장소를 선택하는 기능이 없어 onSelectPlace가 필요 없지만, Map은
+// 필수 prop으로 받습니다. 매 렌더마다 새 화살표 함수(`() => {}`)를 넘기면 참조가 계속
+// 바뀌어서 NaverMap의 마커/폴리라인 effect가 장소 목록이 그대로인데도(예: 검색창에 타이핑할
+// 때마다) 불필요하게 다시 그려집니다. 모듈 스코프 상수라 참조가 항상 같습니다.
+function noop() {}
 
 type LocationPickerProps = {
   initialCoords: Coords | null;
@@ -142,7 +148,11 @@ export default function LocationPicker({
   // 좌표만으로는 이름을 알 수 없는 경우(지도 직접 탭, 지역명 검색 fallback)에 역지오코딩으로
   // "장소명" 제안을 채웁니다. 건물명 → "도로명 근처" → "행정동 선택 위치" → "선택한 위치"
   // 순서로 서버(app/api/reverse-geocode)가 이미 우선순위를 정해서 내려줍니다.
-  const suggestNameFromCoords = async (lat: number, lng: number) => {
+  // useCallback으로 참조를 고정합니다 — ref만 쓰고 상태/props에 의존하지 않으므로 deps는 항상
+  // 비어 있습니다. 아래 handlePickLocation과 Map에 넘기는 onPickLocation의 참조가 매 렌더마다
+  // (예: 검색창에 타이핑할 때마다) 바뀌지 않아야, NaverMap의 마커/폴리라인 effect가 장소 목록이
+  // 그대로인데도 불필요하게 다시 그려지지 않습니다.
+  const suggestNameFromCoords = useCallback(async (lat: number, lng: number) => {
     const token = ++reverseGeocodeTokenRef.current;
     setSuggestedName(null);
     const result = await reverseGeocodeQuery(lat, lng);
@@ -153,15 +163,18 @@ export default function LocationPicker({
     }
     console.log("[Routie] 역지오코딩으로 장소명 제안", result);
     setSuggestedName(result.suggestedName);
-  };
+  }, []);
 
-  const handlePickLocation = (lat: number, lng: number) => {
-    console.log("[Routie] 임시 마커 좌표 갱신", { lat, lng });
-    setPending({ lat, lng });
-    setCandidates([]);
-    setStatusMessage(null);
-    suggestNameFromCoords(lat, lng);
-  };
+  const handlePickLocation = useCallback(
+    (lat: number, lng: number) => {
+      console.log("[Routie] 임시 마커 좌표 갱신", { lat, lng });
+      setPending({ lat, lng });
+      setCandidates([]);
+      setStatusMessage(null);
+      suggestNameFromCoords(lat, lng);
+    },
+    [suggestNameFromCoords]
+  );
 
   // 검색으로 얻은 좌표를 지도로 옮기는 공통 마무리 단계 (장소 선택 후 geocode 성공 시,
   // 또는 지역명 fallback geocode 성공 시 모두 여기를 거칩니다). 이름 제안은 호출하는 쪽에서
@@ -279,7 +292,7 @@ export default function LocationPicker({
             <Map
               places={existingPlaces}
               selectedId={null}
-              onSelectPlace={() => {}}
+              onSelectPlace={noop}
               isPickingLocation
               pickedLocation={pending}
               onPickLocation={handlePickLocation}
@@ -287,13 +300,17 @@ export default function LocationPicker({
               currentLocationOnly={useLiveLocation ? currentLocation : undefined}
             />
 
-            {/* 오늘 외출 + 저장된 장소 0개일 때만 나타납니다. 위치 조회가 끝나기 전에는 지도를
-                가려서, defaultRegion 등 예전 값이 잠깐이라도 보이지 않게 합니다(OutingScreen의
-                작은 지도와 동일한 처리). */}
+            {/* 오늘 외출 + 저장된 장소 0개일 때만 나타납니다. 예전에는 위치 조회가 끝나기 전엔
+                지도를 불투명 오버레이로 완전히 가렸는데, 그러면 지도(스크립트 로딩 포함)가
+                이미 준비돼도 화면이 "멈춘 것처럼" 보였습니다. 지금은 지도를 바로 보여주고
+                (서울 기본값 등으로 시작) 작은 배지만 얹어서, 위치가 나중에 도착하면 지도가
+                부드럽게(panTo) 실제 위치로 옮겨갑니다 — OutingScreen의 작은 지도와 동일한 처리. */}
             {useLiveLocation && locateStatus === "checking" && (
-              <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-accent text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                <p className="text-xs font-medium">현재 위치를 불러오는 중...</p>
+              <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                <p className="flex items-center gap-1.5 whitespace-nowrap rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  현재 위치를 확인하는 중...
+                </p>
               </div>
             )}
 
