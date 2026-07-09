@@ -86,7 +86,7 @@ export default function ScheduleCard({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h3 className="truncate text-sm font-semibold text-foreground">{place.name}</h3>
+            <h3 className="min-w-0 truncate text-sm font-semibold text-foreground">{place.name}</h3>
             {place.time && (
               <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                 {place.time}

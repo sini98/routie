@@ -1,38 +1,24 @@
 "use client";
 
-import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { addDaysToKey, formatDateLabel } from "@/lib/date";
-import BottomSheet from "@/components/BottomSheet";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import WeatherBadge from "@/components/WeatherBadge";
+import { Place } from "@/types/place";
 
 type OutingHeaderProps = {
   date: string;
   isToday: boolean;
-  title: string | null;
-  onRenameTitle: (title: string | null) => void;
+  places: Place[];
 };
 
-export default function OutingHeader({ date, isToday, title, onRenameTitle }: OutingHeaderProps) {
+export default function OutingHeader({ date, isToday, places }: OutingHeaderProps) {
   const router = useRouter();
-  const [isRenameOpen, setIsRenameOpen] = useState(false);
-  const [draftTitle, setDraftTitle] = useState("");
+  // 지정 외출의 날씨는 그 일정의 첫 번째 장소(방문 순서상 맨 앞) 좌표를 기준으로 조회합니다.
+  // 오늘 외출에서는 WeatherBadge가 GPS만 쓰므로 이 값이 쓰이지 않습니다.
+  const scheduleLocation = places.length > 0 ? { lat: places[0].lat, lng: places[0].lng } : undefined;
 
   const goToDate = (targetDate: string) => router.push(`/outing/${targetDate}`);
-
-  const openRename = () => {
-    setDraftTitle(title ?? "");
-    setIsRenameOpen(true);
-  };
-
-  const handleRenameSubmit = (event: FormEvent) => {
-    event.preventDefault();
-    const trimmed = draftTitle.trim();
-    onRenameTitle(trimmed ? trimmed : null);
-    setIsRenameOpen(false);
-  };
 
   return (
     <header
@@ -59,23 +45,8 @@ export default function OutingHeader({ date, isToday, title, onRenameTitle }: Ou
         </button>
 
         <div className="flex min-w-0 flex-col items-center">
-          <div className="flex min-w-0 items-center gap-1">
-            <h1 className="truncate text-base font-bold text-foreground">{title ?? formatDateLabel(date)}</h1>
-            {isToday && (
-              <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-accent-foreground">
-                오늘
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={openRename}
-              aria-label="일정 이름 수정"
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
-            >
-              <Pencil className="h-3 w-3" />
-            </button>
-          </div>
-          <p className="truncate text-xs text-muted-foreground">{title ? formatDateLabel(date) : "하루 일정을 더 쉽게"}</p>
+          <h1 className="truncate text-lg font-bold text-foreground">{formatDateLabel(date)}</h1>
+          <WeatherBadge date={date} isToday={isToday} scheduleLocation={scheduleLocation} />
         </div>
 
         <button
@@ -88,39 +59,27 @@ export default function OutingHeader({ date, isToday, title, onRenameTitle }: Ou
         </button>
       </div>
 
-      {isToday ? (
+      {/* "오늘" 표시와 지정 외출(달력) 바로가기는 다시 서로 독립된 요소입니다 — 한 버튼으로
+          합쳐뒀던 이전 버전과 달리, 지금은 각자 자기 자리와 스타일을 가진 별개의 액션입니다. */}
+      <div className="flex shrink-0 items-center gap-1.5">
+        {isToday && (
+          <span className="rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-accent-foreground">
+            오늘
+          </span>
+        )}
         <button
           type="button"
-          onClick={() => router.push("/calendar")}
+          // 오늘 외출 화면에서 들어온 경우에만 표시해, 지정 외출 화면의 뒤로가기가
+          // 메인이 아니라 이 오늘 외출 화면(/today)으로 돌아갈 수 있게 합니다
+          // (calendar/page.tsx의 뒤로가기 버튼 참고). 지정 외출 쪽 날짜에서는 원래처럼
+          // query 없이 이동해 뒤로가기가 메인으로 갑니다.
+          onClick={() => router.push(isToday ? "/calendar?from=today" : "/calendar")}
           aria-label="지정 외출로 이동"
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted active:scale-95"
         >
           <CalendarIcon className="h-5 w-5" />
         </button>
-      ) : (
-        <div className="w-10 shrink-0" aria-hidden="true" />
-      )}
-
-      <BottomSheet open={isRenameOpen} onOpenChange={setIsRenameOpen} title="일정 이름 수정">
-        <form onSubmit={handleRenameSubmit} className="flex flex-col gap-3">
-          <Input
-            value={draftTitle}
-            onChange={(event) => setDraftTitle(event.target.value)}
-            placeholder={formatDateLabel(date)}
-            maxLength={30}
-            autoFocus
-          />
-          <p className="text-xs text-muted-foreground">비워두면 날짜({formatDateLabel(date)})로 표시돼요.</p>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={() => setIsRenameOpen(false)}>
-              취소
-            </Button>
-            <Button type="submit" className="flex-1">
-              저장
-            </Button>
-          </div>
-        </form>
-      </BottomSheet>
+      </div>
     </header>
   );
 }

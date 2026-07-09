@@ -77,7 +77,7 @@ export default function Calendar({
           type="button"
           onClick={onPrevMonth}
           aria-label="이전 달"
-          className="flex h-8 w-8 items-center justify-center rounded-full text-foreground hover:bg-muted"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-accent"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
@@ -85,7 +85,7 @@ export default function Calendar({
           type="button"
           onClick={() => setIsYearPickerOpen(true)}
           aria-label="연도 선택"
-          className="rounded-md px-2 py-1 text-sm font-semibold text-foreground transition-colors hover:bg-muted active:scale-95"
+          className="rounded-md px-2 py-1 text-sm font-semibold text-foreground transition-colors hover:bg-accent active:scale-95"
         >
           {viewYear}년 {viewMonth + 1}월
         </button>
@@ -93,7 +93,7 @@ export default function Calendar({
           type="button"
           onClick={onNextMonth}
           aria-label="다음 달"
-          className="flex h-8 w-8 items-center justify-center rounded-full text-foreground hover:bg-muted"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-accent"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
@@ -123,11 +123,14 @@ export default function Calendar({
               <span
                 className={cn(
                   "flex h-8 w-8 items-center justify-center rounded-full text-sm transition-colors",
-                  isSelected
+                  // "오늘"이 항상 가장 강조되는 진한 파란색 채움을 갖고(달력을 열었을 때 기본
+                  // 선택값이 오늘이라 두 조건이 자주 동시에 참이 되는데, 그럴 땐 오늘 스타일이
+                  // 우선합니다), 오늘이 아니면서 선택된 날짜는 연한 파란색으로 구분합니다.
+                  isToday
                     ? "bg-primary font-semibold text-primary-foreground"
-                    : isToday
-                      ? "border border-primary text-primary"
-                      : "text-foreground hover:bg-muted"
+                    : isSelected
+                      ? "bg-accent font-semibold text-accent-foreground"
+                      : "text-foreground hover:bg-accent hover:text-accent-foreground"
                 )}
               >
                 {cell.day}
@@ -151,11 +154,13 @@ export default function Calendar({
                 onClick={() => handleSelectYear(year)}
                 className={cn(
                   "flex h-11 items-center justify-center rounded-lg text-sm transition-colors",
-                  isSelectedYear
+                  // 날짜 그리드와 같은 우선순위입니다: 올해가 가장 진하게, 지금 보고 있는
+                  // (올해가 아닌) 연도는 연하게 구분합니다.
+                  isCurrentYear
                     ? "bg-primary font-semibold text-primary-foreground"
-                    : isCurrentYear
-                      ? "border border-primary text-primary"
-                      : "text-foreground hover:bg-muted"
+                    : isSelectedYear
+                      ? "bg-accent font-semibold text-accent-foreground"
+                      : "text-foreground hover:bg-accent hover:text-accent-foreground"
                 )}
               >
                 {year}년

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import Calendar from "@/components/Calendar";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,10 @@ import { getOrderBadge } from "@/lib/order";
 
 export default function CalendarPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // 오늘 외출 화면의 달력 아이콘에서 들어온 경우(?from=today)에는 뒤로가기가 메인이 아니라
+  // 그 오늘 외출 화면으로 돌아갑니다. 메인에서 바로 들어왔거나 이 값이 없으면 기존처럼 메인으로.
+  const cameFromToday = searchParams.get("from") === "today";
   const [outings] = useOutingsMap();
   const today = useMemo(() => new Date(), []);
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -50,8 +54,8 @@ export default function CalendarPage() {
       >
         <button
           type="button"
-          onClick={() => router.push("/")}
-          aria-label="홈으로"
+          onClick={() => router.push(cameFromToday ? "/today" : "/")}
+          aria-label={cameFromToday ? "오늘 외출로 돌아가기" : "홈으로"}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted"
         >
           <ChevronLeft className="h-5 w-5" />

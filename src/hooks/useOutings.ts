@@ -23,13 +23,28 @@ const STORAGE_KEY = "routie:outings";
 type StoredOutingValue = Place[] | Partial<OutingEntry>;
 type StoredOutingMap = Record<string, StoredOutingValue>;
 
+// 아주 오래된 데이터나 예기치 못한 이유로 id가 없거나(레거시 데이터) 같은 id를 공유하는
+// 장소가 남아있으면, key/필터가 모두 id 기준이라 카드가 안 지워지는 것처럼 보일 수 있습니다.
+// 읽어올 때마다 id 없는 장소엔 새 id를 채우고, 같은 id가 중복되면 먼저 나온 것만 남깁니다.
+function normalizePlaces(places: Place[]): Place[] {
+  const seenIds = new Set<string>();
+  const result: Place[] = [];
+  for (const place of places) {
+    const id = place.id || generateId();
+    if (seenIds.has(id)) continue;
+    seenIds.add(id);
+    result.push(place.id ? place : { ...place, id });
+  }
+  return result;
+}
+
 function normalizeEntry(value: StoredOutingValue): OutingEntry {
   if (Array.isArray(value)) {
-    return { title: null, places: value, updatedAt: 0 };
+    return { title: null, places: normalizePlaces(value), updatedAt: 0 };
   }
   return {
     title: value.title ?? null,
-    places: value.places ?? [],
+    places: normalizePlaces(value.places ?? []),
     updatedAt: value.updatedAt ?? 0,
   };
 }

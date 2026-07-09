@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect } from "react";
+import { Fragment } from "react";
 import {
   DndContext,
   KeyboardSensor,
@@ -21,7 +21,6 @@ import { restrictToParentElement, restrictToVerticalAxis } from "@dnd-kit/modifi
 import { Place } from "@/types/place";
 import ScheduleCard from "./ScheduleCard";
 import TravelConnector from "./TravelConnector";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 type ScheduleListProps = {
   places: Place[];
@@ -54,28 +53,6 @@ export default function ScheduleList({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // 드래그로 순서를 한 번이라도 바꿔본 적이 있으면 안내 문구를 더 이상 보여주지 않습니다
-  // (처음 써보는 사용자에게만 필요한 힌트라서, 계속 떠 있으면 오히려 방해가 됩니다).
-  const [hasReordered, setHasReordered, isReorderedFlagLoaded] = useLocalStorage(
-    "routie:hasReorderedSchedule",
-    false
-  );
-
-  // 디버깅용: 배포 환경에서 안내 문구가 안 보인다는 제보가 있어, 실제로 어떤 값 때문에
-  // 조건이 꺼지는지 브라우저 콘솔에서 바로 확인할 수 있게 남겨둡니다. shouldShowDragHint가
-  // false인데 placesLength가 2 이상이라면, hasReordered가 이미 true(이 브라우저에서 예전에
-  // 드래그해본 적이 있음 — localStorage는 도메인별로 남으므로 배포 주소에서 테스트했다면
-  // 정상적인 동작입니다)인지, 혹은 isLoaded가 false로 멈춰있는지(localStorage 접근 자체가
-  // 막혀 있는 경우, 예: 시크릿 모드/쿠키 차단)를 이 값들로 구분할 수 있습니다.
-  useEffect(() => {
-    console.log("[Routie][Debug][ScheduleList] 드래그 안내 문구 표시 여부", {
-      placesLength: places.length,
-      hasReordered,
-      isReorderedFlagLoaded,
-      shouldShowDragHint: places.length >= 2 && !hasReordered,
-    });
-  }, [places.length, hasReordered, isReorderedFlagLoaded]);
-
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -85,7 +62,6 @@ export default function ScheduleList({
     if (oldIndex === -1 || newIndex === -1) return;
 
     onReorder(arrayMove(places, oldIndex, newIndex));
-    if (!hasReordered) setHasReordered(true);
   };
 
   const handleMove = (id: string, direction: "up" | "down") => {
@@ -97,17 +73,7 @@ export default function ScheduleList({
   };
 
   return (
-    <div className="flex flex-col gap-2 px-3 py-3">
-      <div className="flex flex-col gap-0.5 px-1">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">일정</h2>
-          <span className="text-xs text-muted-foreground">총 {places.length}곳</span>
-        </div>
-        {places.length >= 2 && !hasReordered && (
-          <p className="mb-1.5 text-[11px] text-[#999]">카드를 드래그하여 순서를 변경해보세요.</p>
-        )}
-      </div>
-
+    <div className="flex flex-col gap-2">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}

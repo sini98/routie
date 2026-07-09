@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarDays, Copy, Navigation, PencilLine, Star, Trash2 } from "lucide-react";
+import { Bookmark, CalendarDays, Copy, Navigation, PencilLine, Trash2 } from "lucide-react";
 import Header from "@/components/Header";
 import HomeMenuCard from "@/components/HomeMenuCard";
 import RecentOutingCard from "@/components/RecentOutingCard";
@@ -69,30 +69,32 @@ export default function Home() {
         />
         <HomeMenuCard
           href="/favorites"
-          icon={Star}
-          title="즐겨찾기 장소"
+          icon={Bookmark}
+          title="즐겨찾기"
           description="자주 가는 장소를 빠르게 추가해요"
         />
       </div>
 
-      <div className="mt-6 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-5 pb-6">
+      <div className="mt-6 flex min-h-0 flex-1 flex-col gap-2 px-5">
         <h2 className="shrink-0 px-1 text-sm font-semibold text-foreground">최근 작성한 일정</h2>
 
-        {isLoaded && recentOutings.length === 0 && (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border py-10 text-center">
-            <p className="text-sm text-muted-foreground">아직 작성한 일정이 없습니다.</p>
-            <Link
-              href="/today"
-              className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-transform active:scale-95"
-            >
-              새 일정 만들기
-            </Link>
-          </div>
-        )}
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-6">
+          {isLoaded && recentOutings.length === 0 && (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border py-10 text-center">
+              <p className="text-sm text-muted-foreground">아직 작성한 일정이 없습니다.</p>
+              <Link
+                href="/today"
+                className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-transform active:scale-95"
+              >
+                새 일정 만들기
+              </Link>
+            </div>
+          )}
 
-        {recentOutings.map((outing) => (
-          <RecentOutingCard key={outing.date} outing={outing} onOpenMenu={setMenuFor} />
-        ))}
+          {recentOutings.map((outing) => (
+            <RecentOutingCard key={outing.date} outing={outing} onOpenMenu={setMenuFor} />
+          ))}
+        </div>
       </div>
 
       <BottomSheet open={menuFor !== null} onOpenChange={(open) => !open && setMenuFor(null)} title={menuFor?.title ?? ""}>

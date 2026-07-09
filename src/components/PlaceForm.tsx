@@ -3,19 +3,17 @@
 import { FormEvent, useState } from "react";
 import { CheckCircle2, ChevronDown, MapPin } from "lucide-react";
 import { Place } from "@/types/place";
-import { FavoritePlace } from "@/types/favorite";
 import { generateId } from "@/lib/id";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import LocationPicker from "@/components/LocationPicker";
-import CategoryPicker from "@/components/CategoryPicker";
-import { FALLBACK_CATEGORY } from "@/types/category";
+import TimePicker from "@/components/TimePicker";
 
 type PlaceFormProps = {
-  /** 값이 있으면 수정 모드, 없으면 추가 모드로 동작합니다. */
+  /** 값이 있으면 필드가 미리 채워집니다(수정 모드, 또는 즐겨찾기에서 불러온 값으로 미리
+   * 채운 추가 모드). */
   initialValue?: Place;
   /** 이 일정에 이미 저장된 장소들. 위치 선택 화면(큰 지도)에서 bounds를 맞추는 기준으로 씁니다. */
   existingPlaces: Place[];
@@ -23,7 +21,14 @@ type PlaceFormProps = {
   isToday: boolean;
   onCancel: () => void;
   onSubmit: (place: Place) => void;
-  onSaveAsFavorite?: (favorite: FavoritePlace) => void;
+  /** 제출 버튼 문구를 명시적으로 지정합니다. 없으면 initialValue 유무로 "저장하기"/"추가하기"를
+   * 자동 판단합니다 — 즐겨찾기 값으로 미리 채운 "추가" 모드처럼, initialValue는 있지만
+   * 실제로는 새로 추가하는 경우 "추가하기"를 명시적으로 넘겨줍니다. */
+  submitLabel?: string;
+  /** 방문 시간 필드 표시 여부. 기본값 true. 즐겨찾기 화면에서 바로 추가할 때처럼 "시간"
+   * 개념이 없는 곳(FavoritePlace에는 time이 없음)에서는 false로 숨깁니다 — 숨겨도 값을
+   * 아예 입력받지 않을 뿐, 제출되는 place 객체 형태는 그대로입니다. */
+  showTimeField?: boolean;
 };
 
 export default function PlaceForm({
@@ -32,7 +37,8 @@ export default function PlaceForm({
   isToday,
   onCancel,
   onSubmit,
-  onSaveAsFavorite,
+  submitLabel,
+  showTimeField = true,
 }: PlaceFormProps) {
   const isEditing = Boolean(initialValue);
 
@@ -44,8 +50,6 @@ export default function PlaceForm({
   const [error, setError] = useState("");
 
   const [isPickerOpen, setIsPickerOpen] = useState(false);
-  const [saveAsFavorite, setSaveAsFavorite] = useState(false);
-  const [category, setCategory] = useState(FALLBACK_CATEGORY);
 
   const hasPickedLocation = lat.trim() !== "" && lng.trim() !== "";
   // 좌표 직접 입력 UI는 지도 선택 흐름을 디버깅할 때만 필요한 개발자용 도구라, 배포
@@ -99,17 +103,6 @@ export default function PlaceForm({
 
     const trimmedMemo = memo.trim() || undefined;
 
-    if (saveAsFavorite) {
-      onSaveAsFavorite?.({
-        id: generateId(),
-        name: trimmedName,
-        category,
-        memo: trimmedMemo,
-        lat: parsedLat,
-        lng: parsedLng,
-      });
-    }
-
     onSubmit({
       id: initialValue?.id ?? generateId(),
       name: trimmedName,
@@ -122,36 +115,7 @@ export default function PlaceForm({
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3 overflow-y-auto">
-        <div>
-          <Label htmlFor="place-name">장소명 *</Label>
-          <Input
-            id="place-name"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="예: 강남역 스터디카페"
-          />
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            장소 이름은 자동으로 입력돼요. 필요하면 수정할 수 있어요.
-          </p>
-        </div>
-
-        <div>
-          <Label htmlFor="place-time">방문 시간</Label>
-          <Input id="place-time" type="time" value={time} onChange={(event) => setTime(event.target.value)} />
-        </div>
-
-        <div>
-          <Label htmlFor="place-memo">메모</Label>
-          <Textarea
-            id="place-memo"
-            rows={2}
-            value={memo}
-            onChange={(event) => setMemo(event.target.value)}
-            placeholder="예: 대기 시간 보내기"
-          />
-        </div>
-
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <div>
           <Label>위치</Label>
           <Button
@@ -208,24 +172,32 @@ export default function PlaceForm({
           )}
         </div>
 
-        <div className="rounded-md border border-border p-3">
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="save-favorite"
-              checked={saveAsFavorite}
-              onChange={(event) => setSaveAsFavorite(event.target.checked)}
-            />
-            <Label htmlFor="save-favorite" className="mb-0 cursor-pointer">
-              즐겨찾기 장소로 저장
-            </Label>
-          </div>
+        <div>
+          <Label htmlFor="place-name">장소명 *</Label>
+          <Input
+            id="place-name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="예: 강남역 스터디카페"
+          />
+        </div>
 
-          {saveAsFavorite && (
-            <div className="mt-3">
-              <Label>카테고리</Label>
-              <CategoryPicker value={category} onChange={setCategory} />
-            </div>
-          )}
+        {showTimeField && (
+          <div>
+            <Label>방문 시간</Label>
+            <TimePicker value={time} onChange={setTime} />
+          </div>
+        )}
+
+        <div>
+          <Label htmlFor="place-memo">메모</Label>
+          <Textarea
+            id="place-memo"
+            rows={2}
+            value={memo}
+            onChange={(event) => setMemo(event.target.value)}
+            placeholder="예: 대기 시간 보내기"
+          />
         </div>
 
         {error && <p className="text-xs font-medium text-destructive">{error}</p>}
@@ -235,7 +207,7 @@ export default function PlaceForm({
             취소
           </Button>
           <Button type="submit" className="flex-1">
-            {isEditing ? "저장하기" : "추가하기"}
+            {submitLabel ?? (isEditing ? "저장하기" : "추가하기")}
           </Button>
         </div>
       </form>

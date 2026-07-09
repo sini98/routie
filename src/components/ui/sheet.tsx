@@ -1,15 +1,23 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { AnimatePresence, motion } from "framer-motion";
-import { ReactNode } from "react";
+import { AnimatePresence, motion, type PanInfo } from "framer-motion";
+import { ReactNode, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { isLocationPickerOpen } from "@/lib/locationPickerGuard";
+
+const SHEET_MAX_HEIGHT = "88vh";
+const SHEET_MAX_HEIGHT_EXPANDED = "94vh";
+// 핸들을 이만큼(px) 넘게 위/아래로 끌어야 상태가 바뀝니다. 너무 작으면 살짝 스친 것도
+// 확장/축소로 오인하고, 너무 크면 의도한 드래그도 무시됩니다.
+const DRAG_THRESHOLD = 48;
 
 type SheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
+  /** 제목 오른쪽에 붙는 액션(예: 즐겨찾기 별 토글). 없으면 기존과 동일하게 제목만 표시됩니다. */
+  titleAction?: ReactNode;
   children: ReactNode;
 };
 
@@ -24,7 +32,27 @@ type SheetProps = {
  * 그 하위 화면을 Radix Dialog로 만들어 "중첩된 레이어"로 등록되게 하세요(포커스 트랩/바깥 클릭
  * 감지를 Radix가 알아서 최상단 레이어 기준으로 처리해 줍니다). LocationPicker.tsx 참고.
  */
-export function Sheet({ open, onOpenChange, title, children }: SheetProps) {
+export function Sheet({ open, onOpenChange, title, titleAction, children }: SheetProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // 시트를 새로 열 때마다 항상 기본 높이로 시작합니다 — 이전에 확장한 채로 닫았어도
+  // 다음에 열 때는 확장 상태가 남아있지 않습니다.
+  useEffect(() => {
+    if (open) setIsExpanded(false);
+  }, [open]);
+
+  const handleDragEnd = (_: unknown, info: PanInfo) => {
+    if (info.offset.y < -DRAG_THRESHOLD) {
+      setIsExpanded(true);
+    } else if (info.offset.y > DRAG_THRESHOLD) {
+      if (isExpanded) {
+        setIsExpanded(false);
+      } else {
+        onOpenChange(false);
+      }
+    }
+  };
+
   return (
     <Dialog.Root
       open={open}
@@ -71,18 +99,43 @@ export function Sheet({ open, onOpenChange, title, children }: SheetProps) {
             >
               <motion.div
                 className={cn(
-                  "fixed inset-x-0 bottom-0 z-[10000] mx-auto flex max-h-[88vh] w-full max-w-md flex-col rounded-t-lg bg-white p-5 shadow-xl focus:outline-none"
+                  "fixed inset-x-0 bottom-0 z-[10000] mx-auto flex w-full max-w-md flex-col overflow-hidden rounded-t-lg bg-white shadow-xl focus:outline-none"
                 )}
-                style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
+                initial={{ y: "100%", maxHeight: SHEET_MAX_HEIGHT }}
+                animate={{ y: 0, maxHeight: isExpanded ? SHEET_MAX_HEIGHT_EXPANDED : SHEET_MAX_HEIGHT }}
                 exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 32, stiffness: 320 }}
+                transition={{
+                  y: { type: "spring", damping: 32, stiffness: 320 },
+                  maxHeight: { duration: 0.25, ease: "easeOut" },
+                }}
               >
-                <div className="mx-auto mb-4 h-1.5 w-10 shrink-0 rounded-full bg-muted" />
-                <Dialog.Title className="mb-4 text-lg font-bold text-foreground">{title}</Dialog.Title>
+                <div className="flex shrink-0 flex-col px-5 pt-5">
+                  {/* 실제로 보이는 알약(h-1.5 w-10)보다 드래그로 잡을 수 있는 영역(h-5 w-16)을
+                      더 넉넉하게 잡아서, 디자인은 그대로 두면서 손가락으로 잡기 쉽게 했습니다. */}
+                  <motion.div
+                    className="mx-auto mb-4 flex h-5 w-16 shrink-0 cursor-grab items-center justify-center active:cursor-grabbing"
+                    style={{ touchAction: "none" }}
+                    drag="y"
+                    dragConstraints={{ top: 0, bottom: 0 }}
+                    dragElastic={0.5}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <div className="h-1.5 w-10 rounded-full bg-muted" />
+                  </motion.div>
+                  <div className="mb-4 flex items-center justify-between gap-2">
+                    <Dialog.Title className="text-lg font-bold text-foreground">{title}</Dialog.Title>
+                    {titleAction}
+                  </div>
+                </div>
                 <Dialog.Description className="sr-only">{title} 시트입니다.</Dialog.Description>
-                {children}
+                {/* 헤더(핸들+제목)는 고정, 이 영역만 세로 스크롤 — 드래그 핸들의 리사이즈
+                    제스처와 이 안의 스크롤 제스처는 서로 다른 요소라 충돌하지 않습니다. */}
+                <div
+                  className="min-h-0 flex-1 overflow-y-auto px-5"
+                  style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+                >
+                  {children}
+                </div>
               </motion.div>
             </Dialog.Content>
           </Dialog.Portal>

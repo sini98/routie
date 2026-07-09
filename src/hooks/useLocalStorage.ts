@@ -35,15 +35,28 @@ function publish<T>(key: string, value: T) {
 export function useLocalStorage<T>(key: string, initialValue: T) {
   const [value, setValue] = useState<T>(initialValue);
   const [isLoaded, setIsLoaded] = useState(false);
-  // subscribe로 값을 받아 setValue를 호출한 직후인지 표시합니다 — 그 경우는 이미 다른
-  // 인스턴스가 localStorage에 쓰고 publish까지 마쳤으므로, 여기서 다시 쓰거나 재발행하지
-  // 않습니다(무한 핑퐁 방지).
+  // subscribe로 값을 받았거나(다른 인스턴스가 이미 저장을 마침), 마운트 시점에 localStorage에서
+  // 막 읽어온 직후(그 값을 그대로 다시 쓸 필요가 없음)인지 표시합니다. 이 두 경우 모두 여기서
+  // 다시 쓰거나 재발행하지 않습니다.
+  //
+  // 이 플래그가 "구독으로 받은 값"에만 걸려 있던 예전 버전에는 실제 버그가 있었습니다: 같은
+  // key를 쓰는 여러 인스턴스(예: 즐겨찾기 페이지 자신 + useCategories가 내부적으로 쓰는
+  // 또 하나의 useFavorites)가 마운트될 때, 각 인스턴스가 "막 읽어온 값을 로컬 state에
+  // 반영"하는 것도 값이 바뀐 것으로 잡혀 write effect가 다시 실행되고, isExternalUpdate가
+  // false이니 "새로 바뀐 값"이라 착각해 그 값을 localStorage에 그대로 다시 씁니다. 문제는 두
+  // 인스턴스의 마운트/재실행 순서가 겹치면, 다른 인스턴스가 방금 실제로 삭제/수정해 저장한
+  // 최신 값을, 이 인스턴스가 마운트 시점에 읽어뒀던(그보다 오래된) 값으로 되돌려 써버릴 수
+  // 있었다는 점입니다 — 특정 항목을 삭제해도 새로고침하면 다시 나타나는 버그의 원인이었습니다.
   const isExternalUpdate = useRef(false);
 
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(key);
       if (stored) {
+        // 방금 localStorage에서 그대로 읽어온 값이라, 이 값을 다시 localStorage에 쓸 필요가
+        // 없습니다 — 오히려 그사이 다른 인스턴스가 저장해둔 더 최신 값을 이 오래된 값으로
+        // 덮어쓰는 사고로 이어질 수 있어(위 설명 참고), 구독으로 받은 값과 동일하게 취급합니다.
+        isExternalUpdate.current = true;
         setValue(JSON.parse(stored) as T);
       }
     } catch (error) {

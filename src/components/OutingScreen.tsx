@@ -7,6 +7,9 @@ import ScheduleList from "@/components/ScheduleList";
 import BottomSheet from "@/components/BottomSheet";
 import PlaceForm from "@/components/PlaceForm";
 import SavedPlacesPicker from "@/components/SavedPlacesPicker";
+import FavoriteToggleButton from "@/components/FavoriteToggleButton";
+import FavoriteBookmarkButton from "@/components/FavoriteBookmarkButton";
+import CategoryPickerSheet from "@/components/CategoryPickerSheet";
 import FloatingButton from "@/components/FloatingButton";
 import SaveStatusIndicator from "@/components/SaveStatusIndicator";
 import EmptyState from "@/components/EmptyState";
@@ -27,13 +30,23 @@ type OutingScreenProps = {
 };
 
 export default function OutingScreen({ date }: OutingScreenProps) {
-  const { places, setPlaces, title, setTitle } = useOuting(date);
+  const { places, setPlaces } = useOuting(date);
   const [, setFavorites] = useFavorites();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isSavedPlacesOpen, setIsSavedPlacesOpen] = useState(false);
   const [editingPlace, setEditingPlace] = useState<Place | null>(null);
   const [actionsFor, setActionsFor] = useState<Place | null>(null);
+  // "장소 추가" 시트는 아직 저장되지 않은 장소를 다루기 때문에, 좌표로 즐겨찾기 여부를
+  // 판단하는 FavoriteToggleButton(장소 수정용)과 같은 방식을 쓸 수 없습니다. 대신 "제출하면
+  // 이 카테고리로 즐겨찾기에도 추가한다"는 의도만 여기서 들고 있다가, 실제 저장(handleAddPlace)
+  // 시점에 확정된 이름/좌표로 즐겨찾기를 만듭니다.
+  const [pendingFavoriteCategory, setPendingFavoriteCategory] = useState<string | null>(null);
+  const [isAddCategoryPickerOpen, setIsAddCategoryPickerOpen] = useState(false);
+  // 즐겨찾기에서 불러온 값으로 "장소 추가" 폼을 미리 채워둔 상태입니다 — 고르는 즉시
+  // 일정에 추가되지 않고, 이 값으로 채워진 폼을 사용자가 확인/수정한 뒤 "추가하기"를
+  // 눌러야 실제로 추가됩니다.
+  const [favoriteDraft, setFavoriteDraft] = useState<Place | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const isToday = date === getTodayDateString();
@@ -66,6 +79,21 @@ export default function OutingScreen({ date }: OutingScreenProps) {
   // 다시 정렬하지 않으므로, 드래그로 바꿔둔 다른 카드들의 순서는 그대로 유지됩니다.
   const handleAddPlace = (place: Place) => {
     setPlaces((prev) => insertPlaceByTime(prev, place));
+    // 추가 도중 별 아이콘으로 카테고리를 골라뒀다면, 방금 확정된 이름/좌표로 즐겨찾기도 함께 만듭니다.
+    if (pendingFavoriteCategory) {
+      setFavorites((prev) => [
+        ...prev,
+        {
+          id: generateId(),
+          name: place.name,
+          category: pendingFavoriteCategory,
+          memo: place.memo,
+          lat: place.lat,
+          lng: place.lng,
+        },
+      ]);
+      setPendingFavoriteCategory(null);
+    }
     setIsAddOpen(false);
     setSelectedId(place.id);
   };
@@ -90,12 +118,10 @@ export default function OutingScreen({ date }: OutingScreenProps) {
     setSelectedId((current) => (current === id ? null : current));
   };
 
-  const handleSaveAsFavorite = (favorite: FavoritePlace) => {
-    setFavorites((prev) => [...prev, favorite]);
-  };
-
   const handlePickSavedPlace = (favorite: FavoritePlace) => {
-    handleAddPlace({
+    // 바로 일정에 추가하지 않고, "장소 추가" 폼으로 돌아가 이 값으로 미리 채운 채
+    // 사용자가 확인/수정할 수 있게 합니다 — 실제 추가는 그 폼에서 "추가하기"를 눌러야 됩니다.
+    setFavoriteDraft({
       id: generateId(),
       name: favorite.name,
       memo: favorite.memo,
@@ -103,6 +129,7 @@ export default function OutingScreen({ date }: OutingScreenProps) {
       lng: favorite.lng,
     });
     setIsSavedPlacesOpen(false);
+    setIsAddOpen(true);
   };
 
   const handleViewOnMap = () => {
@@ -118,7 +145,7 @@ export default function OutingScreen({ date }: OutingScreenProps) {
 
   return (
     <div className="mx-auto flex h-dvh max-w-md flex-col bg-background">
-      <OutingHeader date={date} isToday={isToday} title={title} onRenameTitle={setTitle} />
+      <OutingHeader date={date} isToday={isToday} places={places} />
 
       <div className="relative isolate z-0 h-[42vh] min-h-[220px] w-full shrink-0 overflow-hidden bg-accent max-[390px]:h-[36vh] max-[390px]:min-h-[190px]">
         {isTodayEmpty && locateStatus === "needs-permission" ? (
@@ -165,36 +192,90 @@ export default function OutingScreen({ date }: OutingScreenProps) {
         />
       </div>
 
-      <div
-        ref={scrollRef}
-        className="relative z-10 flex-1 overflow-y-auto"
-        style={{ paddingBottom: "max(5rem, calc(env(safe-area-inset-bottom) + 4.5rem))" }}
-      >
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col">
         {places.length === 0 ? (
-          <EmptyState />
+          <div
+            ref={scrollRef}
+            className="flex-1 overflow-y-auto"
+            style={{ paddingBottom: "max(5rem, calc(env(safe-area-inset-bottom) + 4.5rem))" }}
+          >
+            <EmptyState />
+          </div>
         ) : (
-          <ScheduleList
-            places={places}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onShowActions={setActionsFor}
-            onEdit={setEditingPlace}
-            onDelete={handleDelete}
-            onReorder={setPlaces}
-          />
+          <>
+            {/* '일정' 제목/안내 문구는 카드 목록과 별개의 고정 영역입니다 — 카드 목록만
+                스크롤되는 아래쪽 div 안에 있지 않아서, 카드를 드래그하거나 목록을 스크롤해도
+                이 영역은 함께 움직이지 않습니다. */}
+            <div className="shrink-0 px-4 pt-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-foreground">일정</h2>
+                <span className="text-xs text-muted-foreground">총 {places.length}곳</span>
+              </div>
+              {places.length >= 2 && (
+                <p className="mt-0.5 text-[11px] text-[#999]">카드를 드래그하여 순서를 변경해보세요.</p>
+              )}
+            </div>
+
+            <div
+              ref={scrollRef}
+              className="min-h-0 flex-1 overflow-y-auto px-3 pt-2"
+              style={{ paddingBottom: "max(5rem, calc(env(safe-area-inset-bottom) + 4.5rem))" }}
+            >
+              <ScheduleList
+                places={places}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                onShowActions={setActionsFor}
+                onEdit={setEditingPlace}
+                onDelete={handleDelete}
+                onReorder={setPlaces}
+              />
+            </div>
+          </>
         )}
       </div>
 
       <SaveStatusIndicator />
-      <FloatingButton onClick={() => setIsAddOpen(true)} />
+      <FloatingButton
+        onClick={() => {
+          setPendingFavoriteCategory(null);
+          setFavoriteDraft(null);
+          setIsAddOpen(true);
+        }}
+      />
 
-      <BottomSheet open={isAddOpen} onOpenChange={setIsAddOpen} title="장소 추가">
+      <BottomSheet
+        open={isAddOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingFavoriteCategory(null);
+            setFavoriteDraft(null);
+          }
+          setIsAddOpen(open);
+        }}
+        title="장소 추가"
+        titleAction={
+          <FavoriteBookmarkButton
+            filled={pendingFavoriteCategory !== null}
+            onClick={() => {
+              if (pendingFavoriteCategory !== null) {
+                setPendingFavoriteCategory(null);
+                return;
+              }
+              setIsAddCategoryPickerOpen(true);
+            }}
+            ariaLabel={pendingFavoriteCategory !== null ? "즐겨찾기 예약 취소" : "저장할 때 즐겨찾기로도 등록"}
+          />
+        }
+      >
         <div className="flex flex-col gap-3">
           <Button
             type="button"
             variant="outline"
             className="w-full"
             onClick={() => {
+              setPendingFavoriteCategory(null);
+              setFavoriteDraft(null);
               setIsAddOpen(false);
               setIsSavedPlacesOpen(true);
             }}
@@ -210,14 +291,27 @@ export default function OutingScreen({ date }: OutingScreenProps) {
           </div>
 
           <PlaceForm
+            key={favoriteDraft?.id ?? "manual"}
+            initialValue={favoriteDraft ?? undefined}
             existingPlaces={places}
             isToday={isToday}
-            onCancel={() => setIsAddOpen(false)}
+            onCancel={() => {
+              setPendingFavoriteCategory(null);
+              setFavoriteDraft(null);
+              setIsAddOpen(false);
+            }}
             onSubmit={handleAddPlace}
-            onSaveAsFavorite={handleSaveAsFavorite}
+            submitLabel="추가하기"
           />
         </div>
       </BottomSheet>
+
+      <CategoryPickerSheet
+        open={isAddCategoryPickerOpen}
+        onOpenChange={setIsAddCategoryPickerOpen}
+        initialCategory={pendingFavoriteCategory}
+        onConfirm={setPendingFavoriteCategory}
+      />
 
       <SavedPlacesPicker open={isSavedPlacesOpen} onOpenChange={setIsSavedPlacesOpen} onPick={handlePickSavedPlace} />
 
@@ -225,6 +319,7 @@ export default function OutingScreen({ date }: OutingScreenProps) {
         open={editingPlace !== null}
         onOpenChange={(open) => !open && setEditingPlace(null)}
         title="장소 수정"
+        titleAction={editingPlace && <FavoriteToggleButton place={editingPlace} />}
       >
         {editingPlace && (
           <PlaceForm
@@ -233,7 +328,6 @@ export default function OutingScreen({ date }: OutingScreenProps) {
             isToday={isToday}
             onCancel={() => setEditingPlace(null)}
             onSubmit={handleEditPlace}
-            onSaveAsFavorite={handleSaveAsFavorite}
           />
         )}
       </BottomSheet>
