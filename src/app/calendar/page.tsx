@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import Calendar from "@/components/Calendar";
@@ -9,7 +9,7 @@ import { useOutingsMap } from "@/hooks/useOutings";
 import { formatDateLabel, getTodayDateString } from "@/lib/date";
 import { getOrderBadge } from "@/lib/order";
 
-export default function CalendarPage() {
+function CalendarContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   // 오늘 외출 화면의 달력 아이콘에서 들어온 경우(?from=today)에는 뒤로가기가 메인이 아니라
@@ -106,5 +106,17 @@ export default function CalendarPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// useSearchParams()를 쓰는 CalendarContent는 Next.js가 빌드 시 이 페이지를 정적으로
+// prerender하려고 시도할 때 Suspense 경계 없이는 실패합니다(Vercel 빌드 오류: "useSearchParams()
+// should be wrapped in a suspense boundary"). fallback은 아래 CalendarContent와 배경색만
+// 맞춰서, 실제로 걸리더라도(대부분 즉시 지나감) 화면이 하얗게 번쩍이지 않게 합니다.
+export default function CalendarPage() {
+  return (
+    <Suspense fallback={<div className="h-dvh bg-background" />}>
+      <CalendarContent />
+    </Suspense>
   );
 }
