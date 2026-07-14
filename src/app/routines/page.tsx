@@ -22,7 +22,6 @@ import { restrictToParentElement, restrictToVerticalAxis } from "@dnd-kit/modifi
 import { ChevronLeft, FolderPlus } from "lucide-react";
 import BottomSheet from "@/components/BottomSheet";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import FloatingButton from "@/components/FloatingButton";
 import RoutineCard from "@/components/RoutineCard";
 import SaveRoutineFlow from "@/components/SaveRoutineFlow";
 import Toast from "@/components/Toast";
@@ -103,9 +102,8 @@ export default function RoutinesPage() {
           <h1 className="text-base font-bold text-foreground">루티 루틴</h1>
           <p className="text-xs text-muted-foreground">반복되는 외출을 템플릿으로 저장해요</p>
         </div>
-        {/* 하단 FAB와 똑같이 "새 루티 루틴 만들기"를 열지만, 아이콘은 일부러 다르게(폴더+)
-            둡니다 — 둘 다 단순 +였다면 같은 화면에 똑같은 모양의 버튼이 두 개 있는 것처럼
-            보여 혼동을 줄 수 있어서, 폴더+로 "루틴 묶음에 새로 추가"라는 의미를 구분합니다. */}
+        {/* "새 루티 루틴 만들기"의 유일한 진입점입니다 — 하단 FAB와 기능이 겹쳐 혼란을
+            줄 수 있어 FAB는 제거하고 이 버튼 하나로만 엽니다. */}
         <button
           type="button"
           onClick={() => setIsCreateOpen(true)}
@@ -118,7 +116,7 @@ export default function RoutinesPage() {
 
       <div
         className="flex flex-1 flex-col gap-2 overflow-y-auto px-4 pt-4"
-        style={{ paddingBottom: "max(5rem, calc(env(safe-area-inset-bottom) + 4.5rem))" }}
+        style={{ paddingBottom: "max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))" }}
       >
         {routines.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">저장된 루티 루틴이 없어요</p>
@@ -148,8 +146,6 @@ export default function RoutinesPage() {
           </>
         )}
       </div>
-
-      <FloatingButton ariaLabel="루티 루틴 추가" onClick={() => setIsCreateOpen(true)} />
 
       <SaveRoutineFlow open={isCreateOpen} onOpenChange={setIsCreateOpen} places={[]} onSaved={showToast} />
 
