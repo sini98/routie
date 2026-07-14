@@ -21,6 +21,10 @@ type ScheduleCardProps = {
   onDelete: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  /** "destructive"(기본값)면 삭제 아이콘이 빨간색입니다(오늘 외출/지정 외출과 동일). 루티
+   * 루틴 상세 화면처럼 "삭제 확인 팝업이 이미 있으니 목록에서는 과하게 강조하지 않아도
+   * 된다"는 화면에서만 "neutral"을 넘겨 수정 아이콘과 같은 회색으로 낮춥니다. */
+  deleteTone?: "destructive" | "neutral";
 };
 
 export default function ScheduleCard({
@@ -35,6 +39,7 @@ export default function ScheduleCard({
   onDelete,
   onMoveUp,
   onMoveDown,
+  deleteTone = "destructive",
 }: ScheduleCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: place.id,
@@ -149,7 +154,12 @@ export default function ScheduleCard({
             type="button"
             variant="ghost"
             size="icon"
-            className="mt-0.5 h-5 w-5 text-destructive hover:bg-destructive/10"
+            className={cn(
+              "mt-0.5 h-5 w-5",
+              deleteTone === "destructive"
+                ? "text-destructive hover:bg-destructive/10"
+                : "text-muted-foreground hover:bg-muted"
+            )}
             onClick={(event) => {
               event.stopPropagation();
               onDelete();

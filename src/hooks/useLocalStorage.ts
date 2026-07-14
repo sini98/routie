@@ -10,19 +10,27 @@ import { notifySaved } from "@/lib/saveStatus";
 // 지역에 멈춰 있었습니다.) 이 모듈 전역 pub/sub으로 같은 key를 쓰는 모든 인스턴스에 변경을
 // 즉시 브로드캐스트합니다.
 type Listener<T> = (value: T) => void;
-const listeners = new Map<string, Set<Listener<unknown>>>();
+// 리스너를 key -> (인스턴스 id -> listener) 맵으로 관리합니다. publish가 "이 값을 방금
+// 저장한 바로 그 인스턴스"는 건너뛰어야 하기 때문에 id가 필요합니다 — Set이었을 때는
+// 이 구분이 없어서, 한 인스턴스가 저장한 뒤 publish가 자기 자신의 구독 콜백까지 불러
+// isExternalUpdate 플래그를 스스로 true로 만들어버렸고, 그 인스턴스의 바로 다음 변경은
+// (실제로는 로컬 변경인데) "외부에서 온 값"으로 오인되어 저장이 통째로 건너뛰어졌습니다
+// (추가/삭제가 "한 번만" 되고 그다음부터 안 먹히던 버그의 원인).
+const listeners = new Map<string, Map<symbol, Listener<unknown>>>();
 
-function subscribe<T>(key: string, listener: Listener<T>) {
-  if (!listeners.has(key)) listeners.set(key, new Set());
-  const set = listeners.get(key)!;
-  set.add(listener as Listener<unknown>);
+function subscribe<T>(key: string, instanceId: symbol, listener: Listener<T>) {
+  if (!listeners.has(key)) listeners.set(key, new Map());
+  const map = listeners.get(key)!;
+  map.set(instanceId, listener as Listener<unknown>);
   return () => {
-    set.delete(listener as Listener<unknown>);
+    map.delete(instanceId);
   };
 }
 
-function publish<T>(key: string, value: T) {
-  listeners.get(key)?.forEach((listener) => listener(value));
+function publish<T>(key: string, value: T, sourceId: symbol) {
+  listeners.get(key)?.forEach((listener, id) => {
+    if (id !== sourceId) listener(value);
+  });
 }
 
 /**
@@ -35,6 +43,10 @@ function publish<T>(key: string, value: T) {
 export function useLocalStorage<T>(key: string, initialValue: T) {
   const [value, setValue] = useState<T>(initialValue);
   const [isLoaded, setIsLoaded] = useState(false);
+  // 이 훅 인스턴스를 다른 인스턴스와 구분하기 위한 고유 id입니다(publish가 자기 자신은
+  // 건너뛰기 위해 씁니다). useRef(Symbol())은 매 렌더마다 Symbol()을 새로 만들긴 하지만
+  // useRef는 최초 렌더의 값만 실제로 유지하므로 인스턴스당 하나로 고정됩니다.
+  const instanceId = useRef(Symbol("useLocalStorage")).current;
   // subscribe로 값을 받았거나(다른 인스턴스가 이미 저장을 마침), 마운트 시점에 localStorage에서
   // 막 읽어온 직후(그 값을 그대로 다시 쓸 필요가 없음)인지 표시합니다. 이 두 경우 모두 여기서
   // 다시 쓰거나 재발행하지 않습니다.
@@ -68,11 +80,11 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
   }, [key]);
 
   useEffect(() => {
-    return subscribe<T>(key, (nextValue) => {
+    return subscribe<T>(key, instanceId, (nextValue) => {
       isExternalUpdate.current = true;
       setValue(nextValue);
     });
-  }, [key]);
+  }, [key, instanceId]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -83,11 +95,11 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
     try {
       window.localStorage.setItem(key, JSON.stringify(value));
       notifySaved();
-      publish(key, value);
+      publish(key, value, instanceId);
     } catch (error) {
       console.error(`Failed to write localStorage key "${key}":`, error);
     }
-  }, [key, value, isLoaded]);
+  }, [key, value, isLoaded, instanceId]);
 
   return [value, setValue, isLoaded] as const;
 }

@@ -13,6 +13,11 @@ type ConfirmDialogProps = {
   confirmLabel?: string;
   cancelLabel?: string;
   onConfirm: () => void;
+  /** 취소 버튼을 감추고 확인 버튼 하나만 보여줍니다 — "예/아니오"가 아니라 단순 안내(alert)에 씁니다. */
+  hideCancel?: boolean;
+  /** 제목을 화면에 보이지 않게 합니다(스크린 리더용으로만 남김) — description 한 줄만 보여주고
+   * 싶은 단순 안내 팝업에 씁니다. */
+  hideTitle?: boolean;
 };
 
 /**
@@ -35,6 +40,8 @@ export default function ConfirmDialog({
   confirmLabel = "삭제",
   cancelLabel = "취소",
   onConfirm,
+  hideCancel = false,
+  hideTitle = false,
 }: ConfirmDialogProps) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -69,14 +76,20 @@ export default function ConfirmDialog({
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.15 }}
                 >
-                  <Dialog.Title className="text-base font-bold text-foreground">{title}</Dialog.Title>
-                  <Dialog.Description className="mt-1.5 text-sm text-muted-foreground">
+                  <Dialog.Title className={hideTitle ? "sr-only" : "text-base font-bold text-foreground"}>
+                    {title}
+                  </Dialog.Title>
+                  <Dialog.Description
+                    className={hideTitle ? "text-sm text-muted-foreground" : "mt-1.5 text-sm text-muted-foreground"}
+                  >
                     {description}
                   </Dialog.Description>
                   <div className="mt-4 flex gap-2">
-                    <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
-                      {cancelLabel}
-                    </Button>
+                    {!hideCancel && (
+                      <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
+                        {cancelLabel}
+                      </Button>
+                    )}
                     <Button
                       type="button"
                       className="flex-1"

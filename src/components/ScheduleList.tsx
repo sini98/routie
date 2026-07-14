@@ -30,6 +30,8 @@ type ScheduleListProps = {
   onEdit: (place: Place) => void;
   onDelete: (id: string) => void;
   onReorder: (places: Place[]) => void;
+  /** ScheduleCard로 그대로 전달합니다 — 기본값은 기존과 동일(빨간 삭제 아이콘). */
+  deleteTone?: "destructive" | "neutral";
 };
 
 export default function ScheduleList({
@@ -40,6 +42,7 @@ export default function ScheduleList({
   onEdit,
   onDelete,
   onReorder,
+  deleteTone,
 }: ScheduleListProps) {
   // MouseSensor는 마우스/펜, TouchSensor는 모바일 터치를 담당합니다.
   // TouchSensor에 delay를 주면 짧은 스크롤 제스처와 드래그 시작 제스처가 충돌하지 않습니다.
@@ -95,6 +98,7 @@ export default function ScheduleList({
                 onDelete={() => onDelete(place.id)}
                 onMoveUp={() => handleMove(place.id, "up")}
                 onMoveDown={() => handleMove(place.id, "down")}
+                deleteTone={deleteTone}
               />
               {index < places.length - 1 && <TravelConnector from={place} to={places[index + 1]} />}
             </Fragment>

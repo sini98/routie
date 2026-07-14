@@ -20,6 +20,15 @@ type CategoryPickerSheetProps = {
   /** 시트 제목. 특정 장소/즐겨찾기에 붙일 카테고리를 "고르는" 맥락이 아니라, 즐겨찾기
    * 화면에서 카테고리 자체를 만들고 관리하는 맥락처럼 문구가 달라야 할 때만 지정합니다. */
   title?: string;
+  /** true(기본값)면 칩을 하나 선택하고 "확인"을 눌러야 확정되는 "카테고리 선택" 화면입니다.
+   * "카테고리 관리"처럼 추가/삭제가 그 자리에서 바로 반영되는 화면에서는 false로 꺼서
+   * "확인" 버튼 자체를 없앱니다 — 즉시 반영되는데 "확인" 버튼이 남아있으면 마치 그 버튼을
+   * 눌러야만 저장되는 것처럼 오해할 수 있습니다. 닫기는 드래그/바깥 탭 등 시트의 기존
+   * 닫기 동작으로 충분해, 별도의 X 버튼은 두지 않습니다(역할 중복). "카테고리 관리"는
+   * 이름 수정 없이 추가/삭제 역할만 담당합니다(이름 수정은 즐겨찾기 화면의 카테고리
+   * 카드에서만 제공합니다).
+   */
+  requireSelection?: boolean;
 };
 
 /**
@@ -37,6 +46,7 @@ export default function CategoryPickerSheet({
   initialCategory = null,
   onConfirm,
   title = "카테고리 선택",
+  requireSelection = true,
 }: CategoryPickerSheetProps) {
   const { categories, addCategory, removeCategory } = useCategories();
   const [selected, setSelected] = useState<string | null>(initialCategory);
@@ -160,9 +170,11 @@ export default function CategoryPickerSheet({
           )}
         </div>
 
-        <Button type="button" className="w-full" disabled={!selected} onClick={handleConfirm}>
-          확인
-        </Button>
+        {requireSelection && (
+          <Button type="button" className="w-full" disabled={!selected} onClick={handleConfirm}>
+            확인
+          </Button>
+        )}
       </div>
 
       <ConfirmDialog

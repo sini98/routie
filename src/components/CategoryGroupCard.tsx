@@ -12,15 +12,16 @@ type CategoryGroupCardProps = {
   group: FavoriteGroup;
   isExpanded: boolean;
   onToggleExpand: () => void;
-  /** "기타"는 삭제 버튼 자체가 뜨지 않습니다 — 삭제는 안 되지만 순서는 바꿀 수 있습니다. */
+  /** "기타"는 이름 수정/삭제 버튼 자체가 뜨지 않습니다 — 둘 다 안 되지만 순서는 바꿀 수 있습니다. */
   canDelete: boolean;
+  onRenameCategory: () => void;
   onDeleteCategory: () => void;
   expandedFavoriteId: string | null;
   onToggleFavoriteExpand: (id: string) => void;
   onRenameFavorite: (favorite: FavoritePlace) => void;
   onChangeFavoriteCategory: (favorite: FavoritePlace) => void;
   onAddFavoriteMenu: (favorite: FavoritePlace) => void;
-  onDeleteFavorite: (id: string) => void;
+  onDeleteFavorite: (favorite: FavoritePlace) => void;
 };
 
 /**
@@ -35,6 +36,7 @@ export default function CategoryGroupCard({
   isExpanded,
   onToggleExpand,
   canDelete,
+  onRenameCategory,
   onDeleteCategory,
   expandedFavoriteId,
   onToggleFavoriteExpand,
@@ -82,6 +84,17 @@ export default function CategoryGroupCard({
         {canDelete && (
           <button
             type="button"
+            onClick={onRenameCategory}
+            aria-label={`${group.category} 카테고리 이름 수정`}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        )}
+
+        {canDelete && (
+          <button
+            type="button"
             onClick={onDeleteCategory}
             aria-label={`${group.category} 카테고리 삭제`}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
@@ -110,15 +123,17 @@ export default function CategoryGroupCard({
                 const isFavoriteExpanded = favorite.id === expandedFavoriteId;
                 return (
                   <div key={favorite.id} className="overflow-hidden rounded-md border border-border bg-white">
-                    {/* 접힌 상태에서도 이름 수정/일정 추가/삭제를 바로 할 수 있도록,
-                        토글 버튼과 세 액션 아이콘을 각각 독립된 버튼으로 나란히 둡니다
-                        (버튼 안에 버튼을 중첩할 수 없어서 한 행 안의 형제 요소로 분리). */}
+                    {/* 태그는 장소의 "정보(속성)"라 이름 옆 왼쪽에 두고, 이름 수정/추가/삭제는
+                        "관리 액션"이라 오른쪽에 한 덩어리로 모읍니다. 왼쪽(토글 버튼 + 태그)은
+                        flex-1을 주지 않아 내용 크기만큼만 차지하고(이름이 길면 truncate),
+                        오른쪽 액션 그룹에 ml-auto를 줘서 둘 사이 남는 공간을 모두 흡수하게
+                        했습니다 — 버튼 안에 버튼을 중첩할 수 없어서 모두 형제 요소로 분리. */}
                     <div className="flex w-full items-center gap-1 p-3">
                       <button
                         type="button"
                         onClick={() => onToggleFavoriteExpand(favorite.id)}
                         aria-label={isFavoriteExpanded ? "접기" : "펼치기"}
-                        className="flex min-w-0 shrink items-center gap-1.5 text-left"
+                        className="flex min-w-0 items-center gap-1.5 text-left"
                       >
                         <ChevronRight
                           className={cn(
@@ -133,15 +148,6 @@ export default function CategoryGroupCard({
 
                       <button
                         type="button"
-                        onClick={() => onRenameFavorite(favorite)}
-                        aria-label="이름 수정"
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-
-                      <button
-                        type="button"
                         onClick={() => onChangeFavoriteCategory(favorite)}
                         aria-label="카테고리 변경"
                         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
@@ -149,25 +155,34 @@ export default function CategoryGroupCard({
                         <Tag className="h-3.5 w-3.5" />
                       </button>
 
-                      <div className="flex-1" />
+                      <div className="ml-auto flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => onAddFavoriteMenu(favorite)}
+                          aria-label="일정에 추가"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
 
-                      <button
-                        type="button"
-                        onClick={() => onAddFavoriteMenu(favorite)}
-                        aria-label="일정에 추가"
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => onRenameFavorite(favorite)}
+                          aria-label="이름 수정"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
 
-                      <button
-                        type="button"
-                        onClick={() => onDeleteFavorite(favorite.id)}
-                        aria-label="삭제"
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-destructive transition-colors hover:bg-destructive/10"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => onDeleteFavorite(favorite)}
+                          aria-label="삭제"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
 
                     <AnimatePresence initial={false}>

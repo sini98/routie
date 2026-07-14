@@ -5,5 +5,8 @@ import { getTodayDateString } from "@/lib/date";
 export const dynamic = "force-dynamic";
 
 export default function TodayRedirectPage() {
-  redirect(`/outing/${getTodayDateString()}`);
+  // from=today는 "오늘 외출 흐름에서 들어왔다"는 표시입니다 — 이후 하루 전/다음으로
+  // 다른 날짜로 이동하거나 지정 외출(캘린더) 화면을 들렀다 돌아와도 이 표시가 유지되어야
+  // 뒤로가기가 홈이 아니라 이 흐름으로 돌아올 수 있습니다(OutingHeader.tsx 참고).
+  redirect(`/outing/${getTodayDateString()}?from=today`);
 }

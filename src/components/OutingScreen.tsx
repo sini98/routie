@@ -1,17 +1,24 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import OutingHeader from "@/components/OutingHeader";
 import Map from "@/components/Map";
 import ScheduleList from "@/components/ScheduleList";
 import BottomSheet from "@/components/BottomSheet";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import PlaceForm from "@/components/PlaceForm";
 import SavedPlacesPicker from "@/components/SavedPlacesPicker";
+import RoutinePickerSheet from "@/components/RoutinePickerSheet";
+import RoutineApplyConflictDialog from "@/components/RoutineApplyConflictDialog";
+import RoutineMenuButton from "@/components/RoutineMenuButton";
+import SaveRoutineFlow from "@/components/SaveRoutineFlow";
+import ScheduleStatusBar from "@/components/ScheduleStatusBar";
+import Toast from "@/components/Toast";
 import FavoriteToggleButton from "@/components/FavoriteToggleButton";
 import FavoriteBookmarkButton from "@/components/FavoriteBookmarkButton";
 import CategoryPickerSheet from "@/components/CategoryPickerSheet";
 import FloatingButton from "@/components/FloatingButton";
-import SaveStatusIndicator from "@/components/SaveStatusIndicator";
 import EmptyState from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { useOuting } from "@/hooks/useOutings";
@@ -23,20 +30,42 @@ import { generateId } from "@/lib/id";
 import { insertPlaceByTime } from "@/lib/scheduleOrder";
 import { Place } from "@/types/place";
 import { FavoritePlace } from "@/types/favorite";
+import { TRANSPORT_LABELS } from "@/types/transport";
 import { Bookmark, LocateFixed, Loader2, MapPin, Navigation } from "lucide-react";
 
 type OutingScreenProps = {
   date: string;
 };
 
+// 화면 맨 아래에는 이제 ScheduleStatusBar(고정, 장소 추가 버튼 바로 아래)가 항상 깔려
+// 있어서, + 버튼과 그 위 스크롤 영역 여백을 그 바 높이만큼 더 띄워야 합니다.
+const STATUS_BAR_CLEARANCE = "calc(env(safe-area-inset-bottom) + 2.25rem)"; // ScheduleStatusBar 자신의 높이(h-9)
+const FAB_BOTTOM_OFFSET = `calc(${STATUS_BAR_CLEARANCE} + 1rem)`; // 상태 바 위로 1rem 띄움
+const SCROLL_BOTTOM_PADDING = `calc(${FAB_BOTTOM_OFFSET} + 4.5rem)`; // + 버튼 높이(3.5rem)+여유
+
 export default function OutingScreen({ date }: OutingScreenProps) {
-  const { places, setPlaces } = useOuting(date);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  // "오늘 외출" 흐름(홈 → 오늘 외출)에서 들어왔는지 표시입니다. 실제 날짜가 오늘인지(isToday)와는
+  // 다른 개념입니다 — 하루 전/다음으로 다른 날짜로 옮겨가도 이 흐름 표시는 유지되어야, 지정
+  // 외출(캘린더)을 들렀다 돌아올 때 홈이 아니라 이 화면(보던 날짜 그대로)으로 돌아올 수 있습니다.
+  const fromTodayFlow = searchParams.get("from") === "today";
+  // 지정 외출 캘린더(날짜 선택 카드)의 "일정 보기"/"+ 새 외출 만들기"로 들어온 경우입니다.
+  // 뒤로가기를 누르면 홈이 아니라 그 캘린더 화면(같은 날짜가 선택된 채)으로 돌아가야 합니다.
+  const fromCalendarFlow = searchParams.get("from") === "calendar";
+  const { places, setPlaces, setTitle, departureTime, transport, updatedAt, setDepartureInfo } = useOuting(date);
   const [, setFavorites] = useFavorites();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isSavedPlacesOpen, setIsSavedPlacesOpen] = useState(false);
+  const [isRoutinePickerOpen, setIsRoutinePickerOpen] = useState(false);
+  const [isRoutineSaveOpen, setIsRoutineSaveOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [editingPlace, setEditingPlace] = useState<Place | null>(null);
   const [actionsFor, setActionsFor] = useState<Place | null>(null);
+  // 삭제 버튼을 눌러도 바로 지우지 않고, 이 장소를 확인 모달에 담아뒀다가 확인을 눌러야
+  // 실제로 지웁니다.
+  const [deleteTarget, setDeleteTarget] = useState<Place | null>(null);
   // "장소 추가" 시트는 아직 저장되지 않은 장소를 다루기 때문에, 좌표로 즐겨찾기 여부를
   // 판단하는 FavoriteToggleButton(장소 수정용)과 같은 방식을 쓸 수 없습니다. 대신 "제출하면
   // 이 카테고리로 즐겨찾기에도 추가한다"는 의도만 여기서 들고 있다가, 실제 저장(handleAddPlace)
@@ -47,6 +76,9 @@ export default function OutingScreen({ date }: OutingScreenProps) {
   // 일정에 추가되지 않고, 이 값으로 채워진 폼을 사용자가 확인/수정한 뒤 "추가하기"를
   // 눌러야 실제로 추가됩니다.
   const [favoriteDraft, setFavoriteDraft] = useState<Place | null>(null);
+  // 이미 장소가 있는 날짜에 루틴을 적용하려 할 때, 바로 채우지 않고 이 값에 잠시 담아둔 뒤
+  // RoutineApplyConflictDialog(추가/덮어쓰기/취소)에서 고른 방식대로 처리합니다.
+  const [pendingRoutineApply, setPendingRoutineApply] = useState<{ name: string; places: Place[] } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const isToday = date === getTodayDateString();
@@ -74,6 +106,37 @@ export default function OutingScreen({ date }: OutingScreenProps) {
       autoLocateEnabled: isTodayEmpty,
     });
   }, [date, isToday, places, locateStatus, currentLocation, isTodayEmpty]);
+
+  // 오늘 외출 흐름(fromTodayFlow)에서, "오늘" 날짜 화면을 열어둔 채로 자정을 넘기면 날짜가
+  // 그대로 굳어버리지 않도록 최신 날짜로 이동합니다. 탭이 백그라운드에 있으면 setInterval이
+  // 늦게 돌거나 아예 멈출 수 있어서, 탭이 다시 보이는 시점(visibilitychange)에도 확인합니다.
+  //
+  // 주의: 하루 전/다음(</> 버튼)으로 다른 날짜를 일부러 보고 있을 때는 절대 이 날짜를
+  // "오늘로" 강제로 되돌리면 안 됩니다. date가 바뀔 때마다(=하루 전/다음으로 이동할 때마다)
+  // 이 effect가 다시 실행되므로, 그 시점에 date가 실제로 "오늘"이었는지(wasTodayWhenLoaded)를
+  // 딱 한 번만 확인해서 값으로 고정해둡니다 — 어제/내일처럼 오늘이 아닌 날짜로 이동한
+  // 직후에는 이 값이 false가 되어 아래 주기적 확인 자체가 아예 걸리지 않고, 사용자가
+  // 나중에 "오늘" 날짜로 돌아왔을 때만(effect가 다시 실행되며 재평가) 다시 걸립니다.
+  useEffect(() => {
+    if (!fromTodayFlow) return;
+
+    const wasTodayWhenLoaded = date === getTodayDateString();
+    if (!wasTodayWhenLoaded) return;
+
+    const checkDateRollover = () => {
+      const actualToday = getTodayDateString();
+      if (actualToday !== date) {
+        router.replace(`/outing/${actualToday}?from=today`);
+      }
+    };
+
+    const interval = setInterval(checkDateRollover, 30_000);
+    document.addEventListener("visibilitychange", checkDateRollover);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", checkDateRollover);
+    };
+  }, [fromTodayFlow, date, router]);
 
   // 방문 시간이 있으면 그 시간에 맞는 자리에 끼워 넣고, 없으면 맨 뒤에 붙입니다. 전체를
   // 다시 정렬하지 않으므로, 드래그로 바꿔둔 다른 카드들의 순서는 그대로 유지됩니다.
@@ -113,9 +176,18 @@ export default function OutingScreen({ date }: OutingScreenProps) {
     setEditingPlace(null);
   };
 
-  const handleDelete = (id: string) => {
-    setPlaces((prev) => prev.filter((place) => place.id !== id));
-    setSelectedId((current) => (current === id ? null : current));
+  const requestDeletePlace = (id: string) => {
+    const place = places.find((candidate) => candidate.id === id);
+    if (place) setDeleteTarget(place);
+  };
+
+  const handleConfirmDeletePlace = () => {
+    if (deleteTarget) {
+      const id = deleteTarget.id;
+      setPlaces((prev) => prev.filter((place) => place.id !== id));
+      setSelectedId((current) => (current === id ? null : current));
+    }
+    setDeleteTarget(null);
   };
 
   const handlePickSavedPlace = (favorite: FavoritePlace) => {
@@ -132,6 +204,40 @@ export default function OutingScreen({ date }: OutingScreenProps) {
     setIsAddOpen(true);
   };
 
+  // 루티 루틴의 장소를 오늘/지정 외출에 채워 넣습니다. 장소 id는 루틴 원본과 완전히
+  // 독립되도록 새로 발급합니다(복제 일정과 동일한 방식). RoutinePickerSheet에서 이번
+  // 일정에만 적용할 장소(제외 반영 완료)를 이미 골라 전달해 주므로 그대로 씁니다.
+  // 이 날짜에 이미 장소가 있으면 바로 덮어쓰지 않고, 추가/덮어쓰기/취소를 먼저 물어봅니다.
+  const handleLoadRoutine = (routineName: string, routinePlaces: Place[]) => {
+    if (places.length > 0) {
+      setPendingRoutineApply({ name: routineName, places: routinePlaces });
+      return;
+    }
+    setPlaces(routinePlaces.map((place) => ({ ...place, id: generateId() })));
+    setTitle(routineName);
+    setIsRoutinePickerOpen(false);
+  };
+
+  const handleAppendRoutine = () => {
+    if (!pendingRoutineApply) return;
+    setPlaces((prev) => [...prev, ...pendingRoutineApply.places.map((place) => ({ ...place, id: generateId() }))]);
+    setPendingRoutineApply(null);
+    setIsRoutinePickerOpen(false);
+  };
+
+  const handleOverwriteRoutine = () => {
+    if (!pendingRoutineApply) return;
+    setPlaces(pendingRoutineApply.places.map((place) => ({ ...place, id: generateId() })));
+    setTitle(pendingRoutineApply.name);
+    setPendingRoutineApply(null);
+    setIsRoutinePickerOpen(false);
+  };
+
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    window.setTimeout(() => setToastMessage(null), 2000);
+  };
+
   const handleViewOnMap = () => {
     if (actionsFor) setSelectedId(actionsFor.id);
     setActionsFor(null);
@@ -145,7 +251,13 @@ export default function OutingScreen({ date }: OutingScreenProps) {
 
   return (
     <div className="mx-auto flex h-dvh max-w-md flex-col bg-background">
-      <OutingHeader date={date} isToday={isToday} places={places} />
+      <OutingHeader
+        date={date}
+        isToday={isToday}
+        places={places}
+        fromTodayFlow={fromTodayFlow}
+        fromCalendarFlow={fromCalendarFlow}
+      />
 
       <div className="relative isolate z-0 h-[42vh] min-h-[220px] w-full shrink-0 overflow-hidden bg-accent max-[390px]:h-[36vh] max-[390px]:min-h-[190px]">
         {isTodayEmpty && locateStatus === "needs-permission" ? (
@@ -194,12 +306,24 @@ export default function OutingScreen({ date }: OutingScreenProps) {
 
       <div className="relative z-10 flex min-h-0 flex-1 flex-col">
         {places.length === 0 ? (
-          <div
-            ref={scrollRef}
-            className="flex-1 overflow-y-auto"
-            style={{ paddingBottom: "max(5rem, calc(env(safe-area-inset-bottom) + 4.5rem))" }}
-          >
-            <EmptyState />
+          // 일정이 없는 날짜는 목록 레이아웃 대신 전용 빈 상태 화면을 보여줍니다 — 이때
+          // 할 수 있는 행동은 "새 외출 만들기"와 "루틴 불러오기" 둘뿐이므로, 같은 행동을
+          // 중복 노출하는 우측 상단 버튼/우측 하단 FAB는 숨기고 가운데 버튼 2개로 모읍니다.
+          <div ref={scrollRef} className="flex-1 overflow-y-auto" style={{ paddingBottom: STATUS_BAR_CLEARANCE }}>
+            {/* min-h-full은 바닥값일 뿐이라 내용이 넘칠 때 잘리지 않고 그대로 스크롤되지만,
+                내용이 짧을 때는(대부분의 화면 높이) 이 영역(지도 아래 ~ 하단 상태 바 위,
+                paddingBottom으로 이미 그 경계까지만 확보됨) 전체를 기준으로 EmptyState
+                그룹 전체가 정확히 세로 한가운데에 오도록 합니다. */}
+            <div className="flex min-h-full flex-col items-center justify-center">
+              <EmptyState
+                onCreateNew={() => {
+                  setPendingFavoriteCategory(null);
+                  setFavoriteDraft(null);
+                  setIsAddOpen(true);
+                }}
+                onLoadRoutine={() => setIsRoutinePickerOpen(true)}
+              />
+            </div>
           </div>
         ) : (
           <>
@@ -209,8 +333,15 @@ export default function OutingScreen({ date }: OutingScreenProps) {
             <div className="shrink-0 px-4 pt-3">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-foreground">일정</h2>
-                <span className="text-xs text-muted-foreground">총 {places.length}곳</span>
+                <RoutineMenuButton onSave={() => setIsRoutineSaveOpen(true)} onLoad={() => setIsRoutinePickerOpen(true)} />
               </div>
+              {(departureTime || transport) && (
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  {departureTime && `출발 ${departureTime}`}
+                  {departureTime && transport && " · "}
+                  {transport && TRANSPORT_LABELS[transport]}
+                </p>
+              )}
               {places.length >= 2 && (
                 <p className="mt-0.5 text-[11px] text-[#999]">카드를 드래그하여 순서를 변경해보세요.</p>
               )}
@@ -219,7 +350,7 @@ export default function OutingScreen({ date }: OutingScreenProps) {
             <div
               ref={scrollRef}
               className="min-h-0 flex-1 overflow-y-auto px-3 pt-2"
-              style={{ paddingBottom: "max(5rem, calc(env(safe-area-inset-bottom) + 4.5rem))" }}
+              style={{ paddingBottom: SCROLL_BOTTOM_PADDING }}
             >
               <ScheduleList
                 places={places}
@@ -227,7 +358,7 @@ export default function OutingScreen({ date }: OutingScreenProps) {
                 onSelect={setSelectedId}
                 onShowActions={setActionsFor}
                 onEdit={setEditingPlace}
-                onDelete={handleDelete}
+                onDelete={requestDeletePlace}
                 onReorder={setPlaces}
               />
             </div>
@@ -235,14 +366,17 @@ export default function OutingScreen({ date }: OutingScreenProps) {
         )}
       </div>
 
-      <SaveStatusIndicator />
-      <FloatingButton
-        onClick={() => {
-          setPendingFavoriteCategory(null);
-          setFavoriteDraft(null);
-          setIsAddOpen(true);
-        }}
-      />
+      {places.length > 0 && (
+        <FloatingButton
+          bottomOffset={FAB_BOTTOM_OFFSET}
+          onClick={() => {
+            setPendingFavoriteCategory(null);
+            setFavoriteDraft(null);
+            setIsAddOpen(true);
+          }}
+        />
+      )}
+      <ScheduleStatusBar placeCount={places.length} updatedAt={updatedAt} />
 
       <BottomSheet
         open={isAddOpen}
@@ -313,7 +447,37 @@ export default function OutingScreen({ date }: OutingScreenProps) {
         onConfirm={setPendingFavoriteCategory}
       />
 
-      <SavedPlacesPicker open={isSavedPlacesOpen} onOpenChange={setIsSavedPlacesOpen} onPick={handlePickSavedPlace} />
+      <SavedPlacesPicker
+        open={isSavedPlacesOpen}
+        onOpenChange={setIsSavedPlacesOpen}
+        onBack={() => {
+          setIsSavedPlacesOpen(false);
+          setIsAddOpen(true);
+        }}
+        onPick={handlePickSavedPlace}
+      />
+
+      <RoutinePickerSheet
+        open={isRoutinePickerOpen}
+        onOpenChange={setIsRoutinePickerOpen}
+        onPick={handleLoadRoutine}
+      />
+
+      <RoutineApplyConflictDialog
+        open={pendingRoutineApply !== null}
+        onOpenChange={(next) => {
+          if (!next) setPendingRoutineApply(null);
+        }}
+        onAppend={handleAppendRoutine}
+        onOverwrite={handleOverwriteRoutine}
+      />
+
+      <SaveRoutineFlow
+        open={isRoutineSaveOpen}
+        onOpenChange={setIsRoutineSaveOpen}
+        places={places}
+        onSaved={showToast}
+      />
 
       <BottomSheet
         open={editingPlace !== null}
@@ -348,6 +512,16 @@ export default function OutingScreen({ date }: OutingScreenProps) {
           </Button>
         </div>
       </BottomSheet>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="장소를 삭제할까요?"
+        description={<>&ldquo;{deleteTarget?.name}&rdquo; 장소를 삭제하면 되돌릴 수 없습니다.</>}
+        onConfirm={handleConfirmDeletePlace}
+      />
+
+      <Toast message={toastMessage} />
     </div>
   );
 }

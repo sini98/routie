@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bookmark, CalendarDays, Copy, Navigation, PencilLine, Trash2 } from "lucide-react";
+import { Bookmark, CalendarDays, Copy, Folder, Navigation, PencilLine, Trash2 } from "lucide-react";
 import Header from "@/components/Header";
 import HomeMenuCard from "@/components/HomeMenuCard";
 import RecentOutingCard from "@/components/RecentOutingCard";
@@ -72,6 +72,12 @@ export default function Home() {
           icon={Bookmark}
           title="즐겨찾기"
           description="자주 가는 장소를 빠르게 추가해요"
+        />
+        <HomeMenuCard
+          href="/routines"
+          icon={Folder}
+          title="루티 루틴"
+          description="반복되는 외출을 템플릿으로 저장해요"
         />
       </div>
 

@@ -3,14 +3,19 @@
 import { useMemo } from "react";
 import { useLocalStorage } from "./useLocalStorage";
 import { Place } from "@/types/place";
+import { TransportMode } from "@/types/transport";
 import { addDaysToKey, formatDateLabel, getTodayDateString } from "@/lib/date";
 import { generateId } from "@/lib/id";
 
-/** 하루치 일정 하나 — 제목(선택), 장소 목록, 마지막으로 저장된 시각(ms) */
+/** 하루치 일정 하나 — 제목(선택), 장소 목록, 마지막으로 저장된 시각(ms). departureTime/
+ * transport는 루티 루틴을 불러와 오늘 외출을 만들 때만 선택적으로 채워집니다 — 루틴
+ * 자체에는 저장되지 않고, 그날 실제로 쓸 값만 이 일정 하나에 담습니다. */
 export type OutingEntry = {
   title: string | null;
   places: Place[];
   updatedAt: number;
+  departureTime?: string;
+  transport?: TransportMode;
 };
 
 /** 날짜(YYYY-MM-DD)를 key로 하는 일정 저장 구조 */
@@ -46,6 +51,8 @@ function normalizeEntry(value: StoredOutingValue): OutingEntry {
     title: value.title ?? null,
     places: normalizePlaces(value.places ?? []),
     updatedAt: value.updatedAt ?? 0,
+    departureTime: value.departureTime,
+    transport: value.transport,
   };
 }
 
@@ -89,12 +96,15 @@ export function useOuting(date: string) {
   const entry = outings[date];
   const places = entry?.places ?? [];
   const title = entry?.title ?? null;
+  const departureTime = entry?.departureTime;
+  const transport = entry?.transport;
+  const updatedAt = entry?.updatedAt;
 
   const setPlaces = (updater: Place[] | ((prev: Place[]) => Place[])) => {
     setOutings((prev) => {
       const current = prev[date]?.places ?? [];
       const next = typeof updater === "function" ? (updater as (prev: Place[]) => Place[])(current) : updater;
-      return { ...prev, [date]: { title: prev[date]?.title ?? null, places: next, updatedAt: Date.now() } };
+      return { ...prev, [date]: { ...prev[date], title: prev[date]?.title ?? null, places: next, updatedAt: Date.now() } };
     });
   };
 
@@ -102,11 +112,26 @@ export function useOuting(date: string) {
   const setTitle = (nextTitle: string | null) => {
     setOutings((prev) => ({
       ...prev,
-      [date]: { title: nextTitle, places: prev[date]?.places ?? [], updatedAt: Date.now() },
+      [date]: { ...prev[date], title: nextTitle, places: prev[date]?.places ?? [], updatedAt: Date.now() },
     }));
   };
 
-  return { places, title, setPlaces, setTitle, isLoaded };
+  /** 루티 루틴을 불러올 때만 씁니다 — 그날 실제로 쓸 출발 시간/이동수단을 이 일정 하나에 담습니다. */
+  const setDepartureInfo = (nextDepartureTime: string, nextTransport: TransportMode) => {
+    setOutings((prev) => ({
+      ...prev,
+      [date]: {
+        ...prev[date],
+        title: prev[date]?.title ?? null,
+        places: prev[date]?.places ?? [],
+        updatedAt: Date.now(),
+        departureTime: nextDepartureTime,
+        transport: nextTransport,
+      },
+    }));
+  };
+
+  return { places, title, departureTime, transport, updatedAt, setPlaces, setTitle, setDepartureInfo, isLoaded };
 }
 
 export type RecentOuting = {

@@ -12,6 +12,8 @@ import { FavoritePlace } from "@/types/favorite";
 type SavedPlacesPickerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** 장소를 고르지 않고 이전 화면("장소 추가")으로 돌아갈 때 호출됩니다. */
+  onBack: () => void;
   onPick: (favorite: FavoritePlace) => void;
 };
 
@@ -21,7 +23,7 @@ type SavedPlacesPickerProps = {
  * 바로 일정에 추가됩니다(검색으로 저장했든 지도에서 직접 찍어 저장했든 category만
  * 보고 묶으므로 둘 다 동일하게 나타납니다).
  */
-export default function SavedPlacesPicker({ open, onOpenChange, onPick }: SavedPlacesPickerProps) {
+export default function SavedPlacesPicker({ open, onOpenChange, onBack, onPick }: SavedPlacesPickerProps) {
   const [favorites] = useFavorites();
   const { categories } = useCategories();
   const groups = useMemo(() => groupFavoritesByCategory(favorites, categories), [favorites, categories]);
@@ -40,59 +42,63 @@ export default function SavedPlacesPicker({ open, onOpenChange, onPick }: SavedP
   };
 
   return (
-    <BottomSheet open={open} onOpenChange={onOpenChange} title="저장한 장소 불러오기">
-      {favorites.length === 0 ? (
-        <p className="py-6 text-center text-sm text-muted-foreground">저장된 즐겨찾기가 없어요</p>
-      ) : (
-        <div className="flex max-h-[60vh] flex-col gap-2 overflow-y-auto pb-1">
-          {groups.map((group) => {
-            const isExpanded = expandedCategories.has(group.category);
-            return (
-              <div key={group.category} className="rounded-md border border-border">
-                <button
-                  type="button"
-                  onClick={() => toggleCategory(group.category)}
-                  className="flex w-full items-center justify-between px-3 py-2.5 text-left transition-colors hover:bg-muted"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <span className="text-sm font-semibold text-foreground">{group.category}</span>
-                    <span className="text-xs text-muted-foreground">{group.favorites.length}개</span>
-                  </span>
-                  <ChevronDown
-                    className={cn(
-                      "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                      isExpanded && "rotate-180"
-                    )}
-                  />
-                </button>
+    <BottomSheet open={open} onOpenChange={onOpenChange} title="저장한 장소 불러오기" onBack={onBack}>
+      <div className="flex flex-col gap-2">
+        {favorites.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">저장된 즐겨찾기가 없어요</p>
+        ) : (
+          <div className="flex max-h-[60vh] flex-col gap-2 overflow-y-auto pb-1">
+            {groups.map((group) => {
+              const isExpanded = expandedCategories.has(group.category);
+              return (
+                <div key={group.category} className="rounded-md border border-border">
+                  <button
+                    type="button"
+                    onClick={() => toggleCategory(group.category)}
+                    className="flex w-full items-center justify-between px-3 py-2.5 text-left transition-colors hover:bg-muted"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-sm font-semibold text-foreground">{group.category}</span>
+                      <span className="text-xs text-muted-foreground">{group.favorites.length}개</span>
+                    </span>
+                    <ChevronDown
+                      className={cn(
+                        "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                        isExpanded && "rotate-180"
+                      )}
+                    />
+                  </button>
 
-                {isExpanded && (
-                  <div className="flex flex-col gap-1.5 border-t border-border p-2">
-                    {group.favorites.map((favorite) => (
-                      <button
-                        key={favorite.id}
-                        type="button"
-                        onClick={() => onPick(favorite)}
-                        className="flex items-center justify-between rounded-md border border-border bg-white p-3 text-left transition-colors hover:bg-muted"
-                      >
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm font-semibold text-foreground">{favorite.name}</span>
-                          {favorite.memo && (
-                            <span className="block truncate text-xs text-muted-foreground">{favorite.memo}</span>
-                          )}
-                        </span>
-                        <span className="shrink-0 rounded-full border border-primary/30 px-3 py-1 text-xs font-medium text-primary">
-                          추가
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+                  {isExpanded && (
+                    <div className="flex flex-col gap-1.5 border-t border-border p-2">
+                      {group.favorites.map((favorite) => (
+                        <button
+                          key={favorite.id}
+                          type="button"
+                          onClick={() => onPick(favorite)}
+                          className="flex items-center justify-between rounded-md border border-border bg-white p-3 text-left transition-colors hover:bg-muted"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold text-foreground">
+                              {favorite.name}
+                            </span>
+                            {favorite.memo && (
+                              <span className="block truncate text-xs text-muted-foreground">{favorite.memo}</span>
+                            )}
+                          </span>
+                          <span className="shrink-0 rounded-full border border-primary/30 px-3 py-1 text-xs font-medium text-primary">
+                            추가
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </BottomSheet>
   );
 }

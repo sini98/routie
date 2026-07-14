@@ -68,12 +68,15 @@ type WeatherBadgeProps = {
   /** 지정 외출(오늘이 아닐 때)에 쓰는 일정 위치 — 그 날짜 일정의 첫 번째 장소 좌표입니다.
    * 오늘 외출에서는 GPS만 쓰므로 이 값을 넘기지 않아도 됩니다. */
   scheduleLocation?: Coords;
+  /** true면 아이콘+온도만 표시합니다(설명 문구 없음) — 캘린더 미리보기 카드처럼 정보를
+   * 최소한으로만 보여줘야 하는 곳에 씁니다. 기본값(false)은 기존처럼 설명 문구까지 보여줍니다. */
+  compact?: boolean;
 };
 
 /** 헤더 날짜 아래에 뜨는 그 날 대표 날씨입니다. 서버(/api/weather)만 호출하고, 기상청 API는
  * 그 서버 라우트 안에서만 호출됩니다. 장소별 지역 변경 시 뜨는 카드 옆 날씨 배지와는 별개로,
  * 항상 유지됩니다. */
-export default function WeatherBadge({ date, isToday, scheduleLocation }: WeatherBadgeProps) {
+export default function WeatherBadge({ date, isToday, scheduleLocation, compact = false }: WeatherBadgeProps) {
   const [state, setState] = useState<WeatherState>({ status: "loading" });
 
   useEffect(() => {
@@ -120,11 +123,21 @@ export default function WeatherBadge({ date, isToday, scheduleLocation }: Weathe
   }, [date, isToday, scheduleLocation?.lat, scheduleLocation?.lng]);
 
   if (state.status === "loading") {
+    if (compact) return null;
     return <p className="truncate text-xs text-muted-foreground">☀️ 날씨 정보를 불러오는 중입니다.</p>;
   }
 
   if (state.status === "error") {
+    if (compact) return null;
     return <p className="truncate text-xs text-muted-foreground">☁️ 날씨 정보를 가져올 수 없습니다.</p>;
+  }
+
+  if (compact) {
+    return (
+      <p className="truncate text-xs text-muted-foreground">
+        {state.data.icon} {state.data.temperature}°
+      </p>
+    );
   }
 
   return (

@@ -2,6 +2,7 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import { AnimatePresence, motion, type PanInfo } from "framer-motion";
+import { ChevronLeft } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { isLocationPickerOpen } from "@/lib/locationPickerGuard";
@@ -15,7 +16,10 @@ const DRAG_THRESHOLD = 48;
 type SheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  title: string;
+  title: ReactNode;
+  /** 제목 왼쪽에 붙는 뒤로가기 버튼(예: 저장한 장소 불러오기 → 장소 추가로 복귀). 없으면
+   * 기존과 동일하게 제목이 맨 앞부터 시작합니다. */
+  onBack?: () => void;
   /** 제목 오른쪽에 붙는 액션(예: 즐겨찾기 별 토글). 없으면 기존과 동일하게 제목만 표시됩니다. */
   titleAction?: ReactNode;
   children: ReactNode;
@@ -32,7 +36,7 @@ type SheetProps = {
  * 그 하위 화면을 Radix Dialog로 만들어 "중첩된 레이어"로 등록되게 하세요(포커스 트랩/바깥 클릭
  * 감지를 Radix가 알아서 최상단 레이어 기준으로 처리해 줍니다). LocationPicker.tsx 참고.
  */
-export function Sheet({ open, onOpenChange, title, titleAction, children }: SheetProps) {
+export function Sheet({ open, onOpenChange, title, onBack, titleAction, children }: SheetProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // 시트를 새로 열 때마다 항상 기본 높이로 시작합니다 — 이전에 확장한 채로 닫았어도
@@ -122,8 +126,20 @@ export function Sheet({ open, onOpenChange, title, titleAction, children }: Shee
                   >
                     <div className="h-1.5 w-10 rounded-full bg-muted" />
                   </motion.div>
-                  <div className="mb-4 flex items-center justify-between gap-2">
-                    <Dialog.Title className="text-lg font-bold text-foreground">{title}</Dialog.Title>
+                  <div className="mb-4 flex items-center gap-2">
+                    {onBack && (
+                      <button
+                        type="button"
+                        onClick={onBack}
+                        aria-label="뒤로가기"
+                        className="-ml-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted"
+                      >
+                        <ChevronLeft className="h-5 w-5" />
+                      </button>
+                    )}
+                    <Dialog.Title className="min-w-0 flex-1 truncate text-lg font-bold text-foreground">
+                      {title}
+                    </Dialog.Title>
                     {titleAction}
                   </div>
                 </div>

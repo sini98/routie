@@ -23,17 +23,33 @@ export function useCategories() {
   // 관리하지 않기 위해, 실제로 즐겨찾기에 쓰이고 있는데 저장된 목록엔 없는 카테고리(예:
   // 예전 시드 데이터나 다른 경로로 들어온 값)가 있으면 항상 이 목록에 합쳐 넣습니다 —
   // 그래야 즐겨찾기 화면에 보이는 카테고리가 장소 추가/수정 화면에서도 똑같이 선택됩니다.
-  // "기타"도 언제나 포함시켜서, 저장된 목록에 아직 없더라도(예: 기존 사용자 데이터) 항상
-  // 기본 카테고리로 보이고 선택할 수 있게 합니다.
+  // "기타"는 여기서 별도로 처리합니다(아래 참고) — usedCategories에 섞여 있으면 삭제된
+  // 카테고리의 즐겨찾기가 우연히 목록 중간에 있다는 이유만으로 "기타"가 중간에 끼어들 수
+  // 있기 때문입니다.
   const usedCategories = favorites
     .map((favorite) => favorite.category?.trim())
-    .filter((category): category is string => Boolean(category));
-  const categories = Array.from(new Set([...storedCategories, ...usedCategories, FALLBACK_CATEGORY]));
+    .filter((category): category is string => Boolean(category) && category !== FALLBACK_CATEGORY);
+  // "기타"는 기본 카테고리라 storedCategories에 없어도 항상 목록에 포함되어야 하지만,
+  // 위치는 두 가지 경우로 나뉩니다: 사용자가 한 번이라도 드래그로 순서를 바꾼 적이 있으면
+  // (reorderCategories가 그 시점의 "기타" 위치까지 포함해 저장하므로) storedCategories 안의
+  // 그 위치를 그대로 따르고, 그런 적이 없으면(기본 상태) 항상 맨 마지막에 옵니다.
+  const hasExplicitFallbackPosition = storedCategories.includes(FALLBACK_CATEGORY);
+  const categories = hasExplicitFallbackPosition
+    ? Array.from(new Set([...storedCategories, ...usedCategories]))
+    : Array.from(new Set([...storedCategories, ...usedCategories, FALLBACK_CATEGORY]));
 
   const addCategory = (name: string) => {
     const trimmed = name.trim();
     if (!trimmed || categories.includes(trimmed)) return;
-    setCategories((prev) => [...prev, trimmed]);
+    setCategories((prev) => {
+      // "기타"를 마지막으로 다시 옮겨둔 뒤에는(prev의 실제 마지막 항목이 "기타") 새
+      // 카테고리를 추가해도 계속 맨 마지막을 지켜야 하므로, 끝에 붙이는 대신 "기타" 바로
+      // 앞에 끼워 넣습니다. 그 외에는 기존처럼 맨 끝에 추가합니다.
+      if (prev.length > 0 && prev[prev.length - 1] === FALLBACK_CATEGORY) {
+        return [...prev.slice(0, -1), trimmed, FALLBACK_CATEGORY];
+      }
+      return [...prev, trimmed];
+    });
   };
 
   const removeCategory = (name: string) => {
